@@ -1,8 +1,6 @@
 import typedefs::*;
 
 module tb_core (
-	apb_if imem_apb,
-	apb_if dmem_apb
 );
 
 logic clk;

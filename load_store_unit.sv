@@ -11,7 +11,7 @@ module load_store_unit (
 		
 	input logic start_i,
 	input logic dir_i,
-	input cs_size size_i,
+	input cs_size write_size_i,
 	input cs_ext load_ext_i,
 
 	apb_if.master dmem_apb,
@@ -37,7 +37,7 @@ module load_store_unit (
 logic [31:0] ldata;
 logic [15:0] ldata_lh;
 always_comb begin
-	case (size_i) 
+	case (write_size_i) 
 		SIZE_W, SIZE_H: ldata_lh = ldata[15:0];
 		SIZE_B: begin
 			if (load_ext_i == EXT_Z) begin
@@ -64,7 +64,7 @@ always_ff @(posedge clk or negedge rst_n) begin
 	end else begin
 		valid_d <= valid;
 		if (valid) begin
-			case (size_i) 
+			case (write_size_i) 
 				SIZE_W: ldata_uh_d <= ldata[31:16];
 				SIZE_H, SIZE_B: ldata_uh_d <= 
 					(load_ext_i == EXT_Z) ?
@@ -80,7 +80,7 @@ apb_controller_sbm dmem_apb_controller (
 
 	.start_i(start_i),
 	.dir_i(dir_i),
-	.size_i(size_i),
+	.write_size_i(write_size_i),
 
 	.apb(dmem_apb),
 

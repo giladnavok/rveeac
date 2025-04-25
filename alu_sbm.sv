@@ -113,7 +113,7 @@ genvar i;
 generate 
 for (i = 0; i < 16; i++) begin
 	if (i == 0) begin
-		shift_filler_combinations[i] = shift_filler_in;
+		assign shift_filler_combinations[i] = shift_filler_in;
 	end else begin
 		assign shift_filler_combinations[i] = {shift_filler_fill [i - 1 :0], shift_filler_in [15 - i : 0] };
 	end

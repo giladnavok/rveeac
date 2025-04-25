@@ -48,6 +48,7 @@ logic load_store_valid;
 logic load_store_err;
 logic load_store_load_data;
 logic transfer_start;
+logic [15:0] lsu_out;
 
 // ALU
 logic [15:0] alu_out;
@@ -71,10 +72,10 @@ load_store_unit load_store (
 
 	.start_i(transfer_start),
 	.dir_i(cs_i.en.dmem_store),
-	.size_i(cs_i.sel.wb_store_size),
+	.write_size_i(cs_i.sel.wb_store_size),
 	.load_ext_i(cs_i.sel.wb_ext),
 
-	.apb(dmem_apb),
+	.dmem_apb(dmem_apb),
 
 	.reg1_i(reg1_data),
 	.addr_i(lsu_addr_i),
@@ -114,7 +115,7 @@ regfile_sbm regfile (
 	.rs2_h_sel_i(rs2_h_sel),
 
 	.rs1_do(reg1_data),
-	.reg2_do(reg2_data)
+	.rs2_do(reg2_data)
 );
 
 // Logic // 

@@ -5,13 +5,13 @@ module regfile_sbm (
 	// --------------- // 
 	input logic clk,
 	input logic rst_n,
-	input logic second_cycle, // if used change to first
+	//input logic second_cycle, // if used change to first
 
 	// Input Controls //
 	// -------------- //
 	input logic write_i,
-	input cs_size write_size_i,
-	input cs_ext write_ext_i,
+	//input cs_size write_size_i,
+	//input cs_ext write_ext_i,
 
 	// Input Data //
 	// ---------- //

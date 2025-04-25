@@ -13,11 +13,11 @@ module control_unit (
 	input logic [2:0] funct3_i,
 	input logic [6:0] funct7_i,
 
-	cs_exe_sel_s exe_sel_d_i,
+	input cs_exe_sel_s exe_sel_d_i,
 
 	// Output Controls //
 	// --------------- //
-	cs_s cs_o
+	output cs_s cs_o
 );
 
 cs_dec_sel_s dec_sel_d;
