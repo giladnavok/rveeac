@@ -71,10 +71,11 @@ package typedefs;
 		ALU_OP_PLUS_4
 	} cs_alu_op;
 
-	typedef enum logic [2:0] {
+	typedef enum logic [1:0] {
 		ALU_WB_SEL_IMM,
 		ALU_WB_SEL_REG,
-		ALU_WB_SEL_PC
+		ALU_WB_SEL_PC,
+		ALU_WB_SEL_ADDER
 	} cs_alu_wb_sel;
 
 	typedef enum logic [2:0] {

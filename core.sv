@@ -5,7 +5,11 @@ module core (
 	input logic rst_n,
 
 	apb_if.master imem_apb,
+	`ifdef DEBUG
+		output logic [15:0] registers_od [1:0][31:0],
+	`endif
 	apb_if.master dmem_apb
+
 );
 
 // Internal Wires //
@@ -34,6 +38,7 @@ logic exe_ready;
 logic exe_cmp_result_valid;
 logic exe_cmp_result;
 logic [31:0] exe_reg1_out;
+logic exe_first_cycle;
 
 //logic dec_flush;
 //logic [1:0] speculative_cycle_counter;
@@ -96,6 +101,7 @@ decode_unit decode (
 	.ready_o(dec_ready),
 	.valid_o(dec_valid),
 	.dmem_load_bypass_o(dec_dmem_load_bypass),
+	.exe_first_cycle_o(exe_first_cycle),
 
 	.lsu_addr_o(dec_lsu_addr_out),
 	.jmp_target_o(dec_jmp_target_out),
@@ -109,6 +115,7 @@ decode_unit decode (
 exe_mem_wb_stage exe_mem_wb (
 	.clk(clk),
 	.rst_n(rst_n),
+	.first_cycle(exe_first_cycle),
 
 	.valid_i(dec_valid),
 	.dmem_load_bypass_i(dec_dmem_load_bypass),
@@ -126,6 +133,11 @@ exe_mem_wb_stage exe_mem_wb (
 	.ready_o(exe_ready),
 	.reg1_o(exe_reg1_out),
 	.cmp_result_o(exe_cmp_result),
+
+	`ifdef DEBUG
+		.registers_od(registers_od),
+	`endif
+
 	.cmp_result_valid_o(exe_cmp_result_valid)
 );
 endmodule

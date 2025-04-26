@@ -75,7 +75,7 @@ imem_apb_controller (
 	.rst_n(rst_n),
 	.start_i(imem_apb_start),
 	.dir_i(1'b0), // read only
-	.write_size_i(cs_size'(W_SIZE_W)), 
+	.write_size_i(cs_size'(SIZE_W)), 
 	.wdata_i(32'b0),
 	.addr_i(fetch_address),
 

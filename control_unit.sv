@@ -58,15 +58,14 @@ always_comb begin
 			// ------------ //
 			// Sel //
 			cs_o.dec.sel.inst_type = INST_TYPE_U;
-			cs_o.dec.sel.alu_wb_sel = ALU_WB_SEL_IMM;
+			cs_o.dec.sel.alu_wb_sel = ALU_WB_SEL_ADDER;
 			// Enable //
-			cs_o.dec.en.alu_a = ENABLE;
+			cs_o.dec.en.wb = ENABLE;
 
 			// Execution Stage //
 			// --------------- //
 			// Sel //
-			cs_o.exe.sel.alu_op = ALU_OP_ADD;
-			cs_o.exe.sel.wb = WB_SEL_ALU;
+			cs_o.exe.sel.wb = WB_SEL_WB;
 			cs_o.exe.sel.wb_store_size = SIZE_W;
 			// Enable //
 			cs_o.exe.en.rf_write = ENABLE;
@@ -243,7 +242,7 @@ always_comb begin
 				FNC3_OP_AND: begin  
 					cs_o.exe.sel.alu_op = ALU_OP_AND;
 				end
-				FNC3_OP_AND: begin  
+				FNC3_OP_OR: begin  
 					cs_o.exe.sel.alu_op = ALU_OP_OR;
 				end
 				FNC3_OP_SLL: begin  

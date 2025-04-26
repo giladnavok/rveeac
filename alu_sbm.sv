@@ -53,6 +53,7 @@ logic [15:0]
 logic [15:0] shift_filler_combinations [15:0];
 logic reduction_or_out;
 logic cmp_result_valid;
+logic cmp_op;
 
 
 // Internal Registers //
@@ -65,7 +66,7 @@ logic carry_in;
 // ---------------- // 
 
 always_ff @(posedge clk or negedge rst_n) begin
-	if (!rst_n | (first_cycle == 1'b1)) begin
+	if (!rst_n | (first_cycle == 1'b0)) begin
 		carry_in <= 1'b0;
 	end else if (adder_used) begin
 		carry_in <= add_out[16];
@@ -95,6 +96,8 @@ end
 
 assign adder_used =
 	op_i inside {ALU_OP_ADD, ALU_OP_SUB, ALU_OP_EQ, ALU_OP_LT, ALU_OP_LTU};
+assign cmp_op =
+	op_i inside {ALU_OP_EQ, ALU_OP_LT, ALU_OP_LTU};
 assign add_out = add_a + add_b + add_carry_in;
 assign not_out = ~not_in;
 assign or_out = or_a | or_b;
@@ -122,7 +125,7 @@ endgenerate
 assign shift_filler_out = shift_filler_combinations[shift_amount];
 
 
-assign cmp_result_valid_o = ne_decided ? 1'b1 : cmp_result_valid | (first_cycle == 1'b0);
+assign cmp_result_valid_o = ne_decided ? 1'b1 : cmp_result_valid | ((first_cycle == 1'b0) && cmp_op);
 assign cmp_result_o = (ne_decided ? 1'b0 : result_o[0]) ^ cmp_flip_i;
 always_comb begin
 	add_a = 16'b0;
@@ -141,6 +144,7 @@ always_comb begin
 	shift_filler_in = 16'b0;
 	shift_filler_fill = 16'b0;
 	cmp_result_valid = 1'b0;
+	add_carry_in = 1'b0;
 	result_o = 16'b0;
 	case (op_i)
 		ALU_OP_ADD: begin 

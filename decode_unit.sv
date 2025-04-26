@@ -26,6 +26,7 @@ module decode_unit (
 	output logic ready_o,
 	output logic valid_o,
 	output logic dmem_load_bypass_o,
+	output logic exe_first_cycle_o,
 
 	// Output Data //
 	// ----------- //
@@ -62,6 +63,8 @@ logic [31:0] add_a, add_b, add_out;
 logic [31:0] serializer_in;
 logic [15:0] serializer_out;
 logic serializer_en, forward_lower_half;
+
+logic is_immediate_op;
 
 
 // Internal Registers //
@@ -113,6 +116,7 @@ always_comb begin
 		ALU_WB_SEL_IMM: serializer_in = imm;
 		ALU_WB_SEL_REG: serializer_in = reg1_i;
 		ALU_WB_SEL_PC: serializer_in = pc_i;
+		ALU_WB_SEL_ADDER: serializer_in = add_out;
 	endcase
 end
 
@@ -120,6 +124,8 @@ assign stall =
 	(cs.dec.en.dmem_load_bypass && !cs_exe_o.en.dmem_store && !ready_i_d) ||
 	(cs_exe_o.en.rf_write && (rd_o == rs1) && !ready_i_d ) ||
 	(cs.dec.en.alu_a && (rd_o == rs2) && cs_exe_o.en.wb_order_flip && !ready_i_d);
+
+assign is_immediate_op = cs.dec.en.alu_a && (cs.dec.sel.alu_wb_sel == ALU_WB_SEL_IMM);
 
 
 
@@ -156,11 +162,12 @@ assign rs2 = inst_i[24:20];
 // ---------------- //
 
 assign valid_o = valid_i;
-assign ready_o = !first_cycle && ready_i;
+assign ready_o = (!first_cycle) | !valid_o;
 assign rs1_o = cs.dec.en.reg_use ? rs1 : rs1_d;
 assign jmp_o = first_cycle && cs.dec.en.jmp;
 assign branch_o = first_cycle && cs.dec.en.branch;
 assign dmem_load_bypass_o = cs.dec.en.dmem_load_bypass && !first_cycle;
+assign jmp_target_o = add_out;
 
 always_ff @(posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
@@ -171,33 +178,33 @@ always_ff @(posedge clk or negedge rst_n) begin
 		rs2_o <= '0;
 		rs1_d <= '0;
 		cs_exe_o <= '0;
+		exe_first_cycle_o <= 1'b1;
 	end else begin
-		if (cs.dec.en.lsu_addr) begin
-			lsu_addr_o <= add_out;
-		end
-		if (cs.dec.en.alu_a) begin
-			alu_a_o <= serializer_out;
-		end
-		if (cs.dec.en.wb) begin
-			wb_o <= serializer_out;
-		end
-		if (cs.dec.en.cs_exe) begin
-			cs_exe_o <= cs.exe;
-		end
-		if (cs.dec.en.reg_use) begin
-			rs1_d <= rs1;
-		end
-		if (cs.dec.en.alu_a && (cs.exe.sel.alu_op != ALU_OP_PLUS_4) && first_cycle) begin
-			rs2_o <= rs2;
-		end
-		if (cs.exe.en.rf_write) begin
-			rd_o <= rd;
+		if (ready_i || ready_i_d) begin
+			exe_first_cycle_o <= first_cycle;
+			if (cs.dec.en.lsu_addr) begin
+				lsu_addr_o <= add_out;
+			end
+			if (cs.dec.en.alu_a) begin
+				alu_a_o <= serializer_out;
+			end
+			if (cs.dec.en.wb) begin
+				wb_o <= serializer_out;
+			end
+			if (cs.dec.en.cs_exe) begin
+				cs_exe_o <= cs.exe;
+			end
+			if (cs.dec.en.reg_use) begin
+				rs1_d <= rs1;
+			end
+			if (cs.dec.en.alu_a && (cs.exe.sel.alu_op != ALU_OP_PLUS_4) && first_cycle) begin
+				rs2_o <= is_immediate_op ? rs1 : rs2;
+			end
+			if (cs.exe.en.rf_write) begin
+				rd_o <= rd;
+			end
 		end
 	end
 end
 
 endmodule
-
-
-
-

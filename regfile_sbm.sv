@@ -25,7 +25,11 @@ module regfile_sbm (
 	// Output Data //
 	// ----------- //
 	output logic [31:0] rs1_do,
+	`ifdef DEBUG
+		output logic [15:0] registers_od [1:0][31:0],
+	`endif
 	output logic [15:0] rs2_do
+
 );
 
 //!Cont Move extention logic outside to reuse for load/stores
@@ -34,6 +38,10 @@ logic [15:0] registers [1:0][31:0];
 assign rs1_do = { registers[1][rs1_i], registers[0][rs1_i] };
 assign rs2_do = registers[rs2_h_sel_i][rs2_i];
 
+`ifdef DEBUG
+	assign registers_od = registers;
+`endif
+
 always_ff @(posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		for (int i = 0; i < 32; i++) begin
@@ -41,7 +49,7 @@ always_ff @(posedge clk or negedge rst_n) begin
 			registers[1][i] <= '0;
 		end
 	end else begin
-		if (write_i && rd_i != 1'b0) begin
+		if (write_i && rd_i != 5'b0) begin
 			registers[rd_h_sel_i][rd_i] <= write_data_i;
 		end
 	end

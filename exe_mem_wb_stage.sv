@@ -8,6 +8,7 @@ module exe_mem_wb_stage #(
 	// --------------- //
 	input logic clk,
 	input logic rst_n,
+	input logic first_cycle,
 
 	// Input Controls //
 	// -------------- //
@@ -35,12 +36,16 @@ module exe_mem_wb_stage #(
 	// ----------- //
 	output logic [31:0] reg1_o,
 	output logic cmp_result_o,
+	`ifdef DEBUG
+		output logic [15:0] registers_od [1:0][31:0],
+	`endif
 	output logic cmp_result_valid_o
+
 );
 
 // Internal Wires //
 // -------------- //
-logic first_cycle;
+//logic first_cycle;
 
 // LSU 
 logic load_store_ready;
@@ -52,8 +57,8 @@ logic [15:0] lsu_out;
 
 // ALU
 logic [15:0] alu_out;
-logic alu_cmp_result;
-logic alu_cmp_result_valid;
+//logic alu_cmp_result;
+//logic alu_cmp_result_valid;
 
 // Regfile
 logic [31:0] reg1_data;
@@ -72,7 +77,7 @@ load_store_unit load_store (
 
 	.start_i(transfer_start),
 	.dir_i(cs_i.en.dmem_store),
-	.write_size_i(cs_i.sel.wb_store_size),
+	.size_i(cs_i.sel.wb_store_size),
 	.load_ext_i(cs_i.sel.wb_ext),
 
 	.dmem_apb(dmem_apb),
@@ -114,19 +119,25 @@ regfile_sbm regfile (
 	.rd_h_sel_i(rd_h_sel),
 	.rs2_h_sel_i(rs2_h_sel),
 
+	`ifdef DEBUG
+		.registers_od(registers_od),
+	`endif
+
 	.rs1_do(reg1_data),
 	.rs2_do(reg2_data)
+
 );
 
 // Logic // 
 // ----- // 
 
-// Generate first_cycle signal
-always_ff @(posedge clk or negedge rst_n) begin
-	if (!rst_n || !valid_i) first_cycle <= 1'b1;
-	else if (ready_o && valid_i) first_cycle <= 1'b1;
-	else first_cycle <= 1'b0;
-end
+//// Generate first_cycle signal
+//always_ff @(posedge clk or negedge rst_n) begin
+//	if (!rst_n) first_cycle <= 1'b0;
+//	else if (!valid_i) first_cycle <= 1'b1;
+//	else if (ready_o && valid_i) first_cycle <= 1'b1;
+//	else first_cycle <= 1'b0;
+//end
 
 // Regfile WB data mux
 always_comb begin
@@ -137,8 +148,8 @@ always_comb begin
 	endcase
 end
 
-assign ready_o = !first_cycle && load_store_ready;
-assign transfer_start = valid_i && (first_cycle & cs_i.en.dmem_store) | dmem_load_bypass_i;
+assign ready_o = load_store_ready;
+assign transfer_start = valid_i && (first_cycle && cs_i.en.dmem_store) | dmem_load_bypass_i;
 assign regfile_write_en = valid_i && cs_i.en.rf_write;
 assign rd_h_sel = !first_cycle ^ cs_i.en.wb_order_flip;
 assign rs2_h_sel = !first_cycle && !cs_i.en.just_first_rs2_half;

@@ -4,10 +4,12 @@ module apb_slave # (
 ) (
 	input logic clk,
 	input logic rst_n,
-	apb_if.slave apb
+	apb_if.slave apb,
+	output logic [31:0] mem_o [63:0]
 );
 
 logic [31:0] mem [63:0];
+assign mem_o = mem;
 
 initial begin
 	if (INIT_FILENAME != "") begin
@@ -20,8 +22,10 @@ always_ff @(posedge clk or negedge rst_n) begin
 		apb.ready <= '0;
 		apb.slverr <= '0;
 		apb.rdata <= '0;
-		for (int i = 0; i < 64; i++) begin
-			mem[i] = i + 32'hffff0000;
+		if (INIT_FILENAME == "") begin
+			for (int i = 0; i < 64; i++) begin
+				mem[i] = i + 32'hffff0000;
+			end
 		end
 	end else begin
 		if (apb.sel && !apb.enable) begin
