@@ -23,6 +23,7 @@ module alu_sbm (
 	// ----------- //
 		
 	
+	output logic shift_bigger_then_16_o,
 	output logic [15:0] result_o,
 	output logic cmp_result_o,
 	output logic cmp_result_valid_o
@@ -54,13 +55,17 @@ logic [15:0] shift_filler_combinations [15:0];
 logic reduction_or_out;
 logic cmp_result_valid;
 logic cmp_op;
+logic cmp_both_positive_d;
+logic early_cmp_verdict;
+logic early_cmp_result;
 
 
 // Internal Registers //
 // ------------------  // 
 logic [15:0] shift_in_d;
-logic ne_decided;
 logic carry_in;
+logic early_cmp_verdict_d;
+logic early_cmp_result_d;
 
 // Sequential Logic // 
 // ---------------- // 
@@ -74,20 +79,16 @@ always_ff @(posedge clk or negedge rst_n) begin
 end
 
 always_ff @(posedge clk or negedge rst_n) begin
-	if (!rst_n) begin
+	if (!rst_n || !first_cycle) begin
+		cmp_both_positive_d <= 1'b0;
 		shift_in_d <= 1'b0;
-	end else if (first_cycle && shift_used) begin
+		early_cmp_verdict_d <= 1'b0;
+		early_cmp_result_d <= 1'b0;
+	end else if (first_cycle /*//! should gate? */ ) begin
+		cmp_both_positive_d <= (a_i[15] == b_i[15]) && (a_i[15] == 0);
 		shift_in_d <= shift_in;
-	end
-end
-
-always_ff @(posedge clk or negedge rst_n) begin
-	if (!rst_n) begin
-		ne_decided <= 1'b0;
-	end else if ((op_i == ALU_OP_EQ) && (first_cycle == 1'b1)) begin
-		if (cmp_result_valid == 1'b1) begin
-			ne_decided <= 1'b1;
-		end
+		early_cmp_verdict_d <= early_cmp_verdict;
+		early_cmp_result_d <= early_cmp_result;
 	end
 end
 
@@ -105,7 +106,7 @@ assign xor_out = xor_a ^ xor_b;
 assign and_out = and_a & and_b;
 assign reduction_or_out = |reduction_or_in;
 assign shift_amount = b_i[3:0];
-assign shift_bigger_then_16 = b_i[4];
+assign shift_bigger_then_16 = shift_used && b_i[4];
 assign shift_out = shift_in >> shift_amount;
 assign shift_used = op_i inside {ALU_OP_SRA, ALU_OP_SRL, ALU_OP_SLL};
 //assign shift_filler_out = {shift_filler_fill[0 +: shift_amount], shift_filler_in[0 +: 15 - shift_amount]};
@@ -125,8 +126,15 @@ endgenerate
 assign shift_filler_out = shift_filler_combinations[shift_amount];
 
 
-assign cmp_result_valid_o = ne_decided ? 1'b1 : cmp_result_valid | ((first_cycle == 1'b0) && cmp_op);
-assign cmp_result_o = (ne_decided ? 1'b0 : result_o[0]) ^ cmp_flip_i;
+assign shift_bigger_then_16_o = shift_bigger_then_16;
+assign cmp_result_valid_o = (early_cmp_verdict || !first_cycle);
+
+always_comb begin
+	if (early_cmp_verdict_d) cmp_result_o = early_cmp_result_d;
+	else if (early_cmp_verdict) cmp_result_o = early_cmp_result;
+	else if (!first_cycle) cmp_result_o = result_o[0];
+end
+
 always_comb begin
 	add_a = 16'b0;
 	add_b = 16'b0;
@@ -144,20 +152,21 @@ always_comb begin
 	shift_filler_in = 16'b0;
 	shift_filler_fill = 16'b0;
 	cmp_result_valid = 1'b0;
+	early_cmp_verdict = 1'b0;
 	add_carry_in = 1'b0;
 	result_o = 16'b0;
 	case (op_i)
 		ALU_OP_ADD: begin 
 			add_a = a_i;
 			add_b = b_i;
-			add_carry_in = carry_in;
+			add_carry_in = first_cycle ? 1'b0 : carry_in;
 			result_o = add_out;
 		end
 		ALU_OP_SUB: begin
 			add_a = a_i;
 			not_in = b_i;
 			add_b = not_out;
-			add_carry_in = ~carry_in;
+			add_carry_in = first_cycle ? 1'b1 : carry_in;
 			result_o = add_out;
 		end
 		ALU_OP_PLUS_4: begin
@@ -181,26 +190,60 @@ always_comb begin
 			result_o = xor_out;
 		end
 		ALU_OP_EQ: begin 
-			xor_a = a_i;
-			xor_b = b_i;
-			reduction_or_in = xor_out;
-			result_o[0] = (reduction_or_out == 0) ^ cmp_flip_i;
-			cmp_result_valid = reduction_or_out ? 1'b1 : 1'b0;
+			result_o = 16'b0;
+			if (!early_cmp_verdict_d) begin
+				xor_a = a_i;
+				xor_b = b_i;
+				reduction_or_in = xor_out;
+				if (first_cycle && (reduction_or_out == 1'b1)) begin
+					early_cmp_verdict = 1'b1;
+					early_cmp_result = cmp_flip_i;
+				end else if (!first_cycle) begin
+					result_o[0] = !reduction_or_out ^ cmp_flip_i;
+				end
+			end else begin
+				result_o[0] = early_cmp_result_d;
+			end
 		end
-		ALU_OP_LT, ALU_OP_LTU: begin 
-			add_a = a_i;
-			not_in = b_i;
-			add_b = not_out;
-			add_carry_in = ~carry_in;
-			if (first_cycle == 1'b0) begin
-				result_o[0] = ((op_i == ALU_OP_LT) ? 
-					((a_i[15] != b_i[15])? a_i[15] : add_out[15])
-					: add_out[15] ) ^ cmp_flip_i;
+		ALU_OP_LT: begin 
+			result_o = 16'b0;
+			if (!early_cmp_verdict_d) begin
+				add_a = a_i;
+				not_in = b_i;
+				add_b = not_out;
+				add_carry_in = 1'b1;
+				reduction_or_in = add_out;
+				if (first_cycle) begin
+					early_cmp_verdict = ((a_i[15] != b_i[15]) || (reduction_or_out == 1'b1));
+					early_cmp_result = ((a_i[15] != b_i[15]) ? a_i[15] : !add_out[16]) ^ cmp_flip_i;
+				end else begin
+					result_o[0] = !add_out[16] ^ cmp_flip_i ^ cmp_both_positive_d;
+				end
+			end else begin
+				result_o[0] = early_cmp_result_d;
+			end
+		end
+		ALU_OP_LTU: begin 
+			result_o = 16'b0;
+			if (!early_cmp_verdict_d) begin
+				add_a = a_i;
+				not_in = b_i;
+				add_b = not_out;
+				add_carry_in = 1'b1;
+				reduction_or_in = add_out;
+				if (first_cycle && (reduction_or_out == 1'b1)) begin
+					early_cmp_verdict = 1'b1;
+					early_cmp_result = !add_out[16] ^ cmp_flip_i;
+				end else if (!first_cycle) begin
+					result_o[0] = !add_out[16] ^ cmp_flip_i;
+				end
+			end else begin
+				result_o[0] = early_cmp_result_d;
 			end
 		end
 		ALU_OP_SRL: begin
 			if (shift_bigger_then_16 && first_cycle) begin
-				shift_in = a_i;
+				shift_in = 16'b0;
 				result_o = 16'b0;
 			end else begin
 				shift_in = a_i;
@@ -215,7 +258,7 @@ always_comb begin
 		end
 		ALU_OP_SRA: begin
 			if (shift_bigger_then_16 && first_cycle) begin
-				shift_in = a_i;
+				shift_in = {16{a_i[15]}};
 				result_o = {16{a_i[15]}};
 			end else begin
 				shift_in = a_i;
@@ -232,11 +275,11 @@ always_comb begin
 		end
 		ALU_OP_SLL: begin
 			if (shift_bigger_then_16 && first_cycle) begin
-				shift_in = a_i;
+				shift_in = 16'b0;
 				result_o = 16'b0;
 			end else begin
 				reverse_a_in = a_i;
-				shift_in = reverse_a_in;
+				shift_in = reverse_a_out;
 				if (first_cycle) begin
 					reverse_b_in = shift_out;
 					result_o = reverse_b_out;

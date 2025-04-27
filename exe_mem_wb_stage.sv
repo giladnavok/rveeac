@@ -22,6 +22,7 @@ module exe_mem_wb_stage #(
 	// ---------- //
 		
 	input logic [31:0] lsu_addr_i,
+	input logic [31:0] load_addr_bypass_i,
 	input logic [15:0] alu_a_i,
 	input logic [15:0] wb_i,
 	input logic [4:0] rd_i,
@@ -54,6 +55,7 @@ logic load_store_err;
 logic load_store_load_data;
 logic transfer_start;
 logic [15:0] lsu_out;
+logic [31:0] lsu_addr;
 
 // ALU
 logic [15:0] alu_out;
@@ -83,7 +85,7 @@ load_store_unit load_store (
 	.dmem_apb(dmem_apb),
 
 	.reg1_i(reg1_data),
-	.addr_i(lsu_addr_i),
+	.addr_i(lsu_addr),
 
 	.ready_o(load_store_ready),
 	.valid_o(load_store_valid),
@@ -149,11 +151,12 @@ always_comb begin
 end
 
 assign ready_o = load_store_ready;
-assign transfer_start = valid_i && (first_cycle && cs_i.en.dmem_store) | dmem_load_bypass_i;
+assign transfer_start = (valid_i && (first_cycle && cs_i.en.dmem_store)) | dmem_load_bypass_i;
 assign regfile_write_en = valid_i && cs_i.en.rf_write;
-assign rd_h_sel = !first_cycle ^ cs_i.en.wb_order_flip;
+assign rd_h_sel = !first_cycle ^ cs_i.en.wb_order_flip; 
 assign rs2_h_sel = !first_cycle && !cs_i.en.just_first_rs2_half;
 assign reg1_o = reg1_data;
+assign lsu_addr = dmem_load_bypass_i ? load_addr_bypass_i : lsu_addr_i;
 
 endmodule
 

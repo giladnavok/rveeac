@@ -17,6 +17,7 @@ module decode_unit (
 	input logic [31:0] inst_i,
 	input logic [31:0] pc_i,
 	input logic [31:0] reg1_i,
+	input logic shift_bigger_then_16_i,
 
 	// Output Controls //
 	// --------------- //
@@ -31,6 +32,7 @@ module decode_unit (
 	// Output Data //
 	// ----------- //
 	output logic [31:0] lsu_addr_o,
+	output logic [31:0] dmem_load_addr_bypass_o,
 	output logic [31:0] jmp_target_o,
 	output logic [15:0] alu_a_o,
 	output logic [15:0] wb_o,
@@ -126,14 +128,13 @@ assign stall =
 	(cs.dec.en.alu_a && (rd_o == rs2) && cs_exe_o.en.wb_order_flip && !ready_i_d);
 
 assign is_immediate_op = cs.dec.en.alu_a && (cs.dec.sel.alu_wb_sel == ALU_WB_SEL_IMM);
-
-
+assign dmem_load_addr_bypass_o = add_out;
 
 // Generate first_cycle
 always_ff @(posedge clk or negedge rst_n) begin
 	if (!rst_n || !valid_i) first_cycle <= 1'b1;
 	else if (stall) first_cycle <= first_cycle;
-	else if (ready_o && valid_i) first_cycle <= 1'b1;
+	else if (ready_o && valid_i) first_cycle <= 1'b1; //! why valid_i?
 	else first_cycle <= 1'b0;
 end
 
@@ -163,11 +164,22 @@ assign rs2 = inst_i[24:20];
 
 assign valid_o = valid_i;
 assign ready_o = (!first_cycle) | !valid_o;
-assign rs1_o = cs.dec.en.reg_use ? rs1 : rs1_d;
 assign jmp_o = first_cycle && cs.dec.en.jmp;
 assign branch_o = first_cycle && cs.dec.en.branch;
-assign dmem_load_bypass_o = cs.dec.en.dmem_load_bypass && !first_cycle;
+assign dmem_load_bypass_o = cs.dec.en.dmem_load_bypass;
 assign jmp_target_o = add_out;
+
+always_comb begin
+	if (cs.dec.en.reg_use) begin
+		if (cs.exe.en.dmem_store) begin
+			rs1_o = first_cycle ? rs1 : rs2;
+		end else begin
+			rs1_o = rs1;
+		end
+	end else begin
+		rs1_o = rs1_d;
+	end
+end
 
 always_ff @(posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
@@ -182,10 +194,10 @@ always_ff @(posedge clk or negedge rst_n) begin
 	end else begin
 		if (ready_i || ready_i_d) begin
 			exe_first_cycle_o <= first_cycle;
-			if (cs.dec.en.lsu_addr) begin
+			if (first_cycle && cs.dec.en.lsu_addr) begin
 				lsu_addr_o <= add_out;
 			end
-			if (cs.dec.en.alu_a) begin
+			if (cs.dec.en.alu_a && !shift_bigger_then_16_i) begin
 				alu_a_o <= serializer_out;
 			end
 			if (cs.dec.en.wb) begin

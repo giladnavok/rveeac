@@ -46,7 +46,7 @@ localparam WRITE = 1'b1;
 
 always_comb begin
 	ready_o = (state_e == ST_READY) ? 1'b1 : apb.ready;
-	valid_o = (state_e == ST_TRANS) & apb.ready & ~apb.slverr;
+	valid_o = (state_e == ST_TRANS) && apb.ready && !apb.slverr;
 	err_o = apb.slverr;
 	apb.addr = addr_i;
 	apb.wdata = (dir_i == WRITE)? wdata_i : {DAT_W{1'b0}};

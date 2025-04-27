@@ -1,6 +1,7 @@
 
 module apb_slave # (
-	INIT_FILENAME = ""
+	INIT_FILENAME = "",
+	SET_INDEX = 1'b0
 ) (
 	input logic clk,
 	input logic rst_n,
@@ -17,19 +18,25 @@ initial begin
 	end 
 end
 
+assign apb.rdata = (apb.sel && apb.enable && apb.write == 1'b0) ? mem[(apb.addr/4) % 64] : 32'bx;
+assign apb.ready = (apb.sel && apb.enable);
+assign apb.slverr = 1'b0;
+
 always_ff @(posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
-		apb.ready <= '0;
-		apb.slverr <= '0;
-		apb.rdata <= '0;
 		if (INIT_FILENAME == "") begin
-			for (int i = 0; i < 64; i++) begin
-				mem[i] = i + 32'hffff0000;
+			if (SET_INDEX) begin
+				for (int i = 0; i < 64; i++) begin
+					mem[i] = i + 32'hffff0000;
+				end
+			end else begin
+				for (int i = 0; i < 64; i++) begin
+					mem[i] = '0;
+				end
 			end
 		end
 	end else begin
 		if (apb.sel && !apb.enable) begin
-			apb.ready <= 1'b1;
 			if (apb.write) begin
 				case (apb.strb) 
 					4'b1111: mem[apb.addr/4] <= apb.wdata;
@@ -37,14 +44,7 @@ always_ff @(posedge clk or negedge rst_n) begin
 					4'b0001: mem[apb.addr/4][7:0] <= apb.wdata[7:0];
 					default: mem[apb.addr/4] <= apb.wdata;
 				endcase
-			end else begin
-				apb.rdata <= mem[(apb.addr/4) % 64];
 			end
-		end else if (apb.ready) begin
-			apb.ready <= 1'b0;
-			apb.rdata <= 32'bx;
-		end else begin
-			apb.rdata <= 32'bx;
 		end
 	end
 end

@@ -192,7 +192,6 @@ always_comb begin
 			// Execution Stage //
 			// --------------- //
 			// Sel //
-			cs_o.exe.sel.wb = WB_SEL_LSU;
 			// Enable //
 			cs_o.exe.en.dmem_store = ENABLE;
 			case (funct3_store_e'(funct3_i))

@@ -25,6 +25,7 @@ logic dec_valid;
 logic dec_jmp;
 logic dec_branch;
 logic dec_dmem_load_bypass;
+logic [31:0] dec_dmem_load_addr_bypass;
 cs_exe_s dec_cs_exe_out;
 logic [31:0] dec_jmp_target_out;
 logic [31:0] dec_lsu_addr_out;
@@ -39,6 +40,7 @@ logic exe_cmp_result_valid;
 logic exe_cmp_result;
 logic [31:0] exe_reg1_out;
 logic exe_first_cycle;
+logic exe_shift_bigger_then_16;
 
 //logic dec_flush;
 //logic [1:0] speculative_cycle_counter;
@@ -94,6 +96,7 @@ decode_unit decode (
 	.inst_i(fetch_inst_out),
 	.pc_i(fetch_pc_out),
 	.reg1_i(exe_reg1_out),
+	.shift_bigger_then_16_i(exe_shift_bigger_then_16),
 
 	.cs_exe_o(dec_cs_exe_out),
 	.jmp_o(dec_jmp),
@@ -104,6 +107,7 @@ decode_unit decode (
 	.exe_first_cycle_o(exe_first_cycle),
 
 	.lsu_addr_o(dec_lsu_addr_out),
+	.dmem_load_addr_bypass_o(dec_dmem_load_addr_bypass),
 	.jmp_target_o(dec_jmp_target_out),
 	.alu_a_o(dec_alu_a_out),
 	.wb_o(dec_wb_data_out),
@@ -124,6 +128,7 @@ exe_mem_wb_stage exe_mem_wb (
 	.dmem_apb(dmem_apb),
 
 	.lsu_addr_i(dec_lsu_addr_out),
+	.load_addr_bypass_i(dec_dmem_load_addr_bypass),
 	.alu_a_i(dec_alu_a_out),
 	.wb_i(dec_wb_data_out),
 	.rd_i(dec_rd_out),
@@ -133,6 +138,7 @@ exe_mem_wb_stage exe_mem_wb (
 	.ready_o(exe_ready),
 	.reg1_o(exe_reg1_out),
 	.cmp_result_o(exe_cmp_result),
+	.shift_bigger_then_16_o(exe_shift_bigger_then_16),
 
 	`ifdef DEBUG
 		.registers_od(registers_od),
