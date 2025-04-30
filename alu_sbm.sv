@@ -127,7 +127,7 @@ assign shift_filler_out = shift_filler_combinations[shift_amount];
 
 
 assign shift_bigger_then_16_o = shift_bigger_then_16;
-assign cmp_result_valid_o = (early_cmp_verdict || !first_cycle);
+assign cmp_result_valid_o = cmp_op && (early_cmp_verdict || !first_cycle);
 
 always_comb begin
 	if (early_cmp_verdict_d) cmp_result_o = early_cmp_result_d;
@@ -170,7 +170,7 @@ always_comb begin
 			result_o = add_out;
 		end
 		ALU_OP_PLUS_4: begin
-			add_a = a_i;
+			add_a = b_i;
 			add_b = first_cycle ? 16'd4 : 16'b0;
 			result_o = add_out;
 		end

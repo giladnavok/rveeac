@@ -29,16 +29,16 @@ logic [31:0] dec_dmem_load_addr_bypass;
 cs_exe_s dec_cs_exe_out;
 logic [31:0] dec_jmp_target_out;
 logic [31:0] dec_lsu_addr_out;
-logic [15:0] dec_alu_a_out;
+logic [15:0] dec_alu_b_out;
 logic [15:0] dec_wb_data_out;
 logic [4:0] dec_rd_out;
-logic [4:0] dec_rs1_out;
-logic [4:0] dec_rs2_out;
+logic [4:0] dec_rs32_out;
+logic [4:0] dec_rs16_out;
 
 logic exe_ready;
 logic exe_cmp_result_valid;
 logic exe_cmp_result;
-logic [31:0] exe_reg1_out;
+logic [31:0] exe_reg32_out;
 logic exe_first_cycle;
 logic exe_shift_bigger_then_16;
 
@@ -95,8 +95,7 @@ decode_unit decode (
 
 	.inst_i(fetch_inst_out),
 	.pc_i(fetch_pc_out),
-	.reg1_i(exe_reg1_out),
-	.shift_bigger_then_16_i(exe_shift_bigger_then_16),
+	.reg32_i(exe_reg32_out),
 
 	.cs_exe_o(dec_cs_exe_out),
 	.jmp_o(dec_jmp),
@@ -109,11 +108,11 @@ decode_unit decode (
 	.lsu_addr_o(dec_lsu_addr_out),
 	.dmem_load_addr_bypass_o(dec_dmem_load_addr_bypass),
 	.jmp_target_o(dec_jmp_target_out),
-	.alu_a_o(dec_alu_a_out),
+	.alu_b_o(dec_alu_b_out),
 	.wb_o(dec_wb_data_out),
 	.rd_o(dec_rd_out),
-	.rs1_o(dec_rs1_out),
-	.rs2_o(dec_rs2_out)
+	.rs32_o(dec_rs32_out),
+	.rs16_o(dec_rs16_out)
 );
 
 exe_mem_wb_stage exe_mem_wb (
@@ -129,14 +128,14 @@ exe_mem_wb_stage exe_mem_wb (
 
 	.lsu_addr_i(dec_lsu_addr_out),
 	.load_addr_bypass_i(dec_dmem_load_addr_bypass),
-	.alu_a_i(dec_alu_a_out),
+	.alu_b_i(dec_alu_b_out),
 	.wb_i(dec_wb_data_out),
 	.rd_i(dec_rd_out),
-	.rs1_i(dec_rs1_out),
-	.rs2_i(dec_rs2_out),
+	.rs32_i(dec_rs32_out),
+	.rs16_i(dec_rs16_out),
 
 	.ready_o(exe_ready),
-	.reg1_o(exe_reg1_out),
+	.reg32_o(exe_reg32_out),
 	.cmp_result_o(exe_cmp_result),
 	.shift_bigger_then_16_o(exe_shift_bigger_then_16),
 

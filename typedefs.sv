@@ -82,7 +82,7 @@ package typedefs;
 		CMP_OUT_SEL_EQ,
 		CMP_OUT_SEL_LT,
 		CMP_OUT_SEL_LTU
-	} cs_alu_a_sel;
+	} cs_alu_b_sel;
 
 	typedef enum logic {
 		SER_START_LH = 1'b0,
@@ -96,7 +96,7 @@ package typedefs;
 
 	typedef struct packed {
 		logic pff_lsu_addr_en;
-		logic pff_alu_a_en;
+		logic pff_alu_b_en;
 		logic pff_cs_exe_en;
 	} cs_pff_s;
 
@@ -111,13 +111,15 @@ package typedefs;
 
 	typedef struct packed {
 		logic lsu_addr;
-		logic alu_a;
+		logic alu_b;
 		logic wb;
 		logic cs_exe;
-		logic reg_use;
+		logic reg32_use;
+		logic reg16_use;
 		logic dmem_load_bypass;
 		logic jmp;
 		logic branch;
+		logic forward_just_one_half;
 	} cs_dec_en_s;
 
 	typedef struct packed {
@@ -137,7 +139,7 @@ package typedefs;
 		logic dmem_store;
 		logic cmp_flip;
 		logic wb_order_flip;
-		logic just_first_rs2_half;
+		logic rs16_half_order_flip;
 	} cs_exe_en_s;
 
 	typedef struct packed {
@@ -218,13 +220,15 @@ package typedefs;
 	parameter cs_dec_en_s 
 	CS_DEC_EN_DEFAULT = '{
 			lsu_addr: DISABLE,
-			alu_a: DISABLE,
+			alu_b: DISABLE,
 			wb: DISABLE,
-			reg_use: DISABLE,
+			reg16_use: DISABLE,
+			reg32_use: DISABLE,
 			cs_exe: ENABLE,
 			dmem_load_bypass: DISABLE,
 			jmp: DISABLE,
-			branch: DISABLE
+			branch: DISABLE,
+			forward_just_one_half: DISABLE
 		};
 	parameter cs_exe_en_s 
 	CS_EXE_EN_DEFAULT = '{
@@ -232,7 +236,7 @@ package typedefs;
 			dmem_store: DISABLE,
 			cmp_flip: DISABLE,
 			wb_order_flip: DISABLE,
-			just_first_rs2_half: DISABLE
+			rs16_half_order_flip: DISABLE
 		};
 endpackage
 

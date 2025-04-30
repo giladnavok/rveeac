@@ -15,28 +15,28 @@ module regfile_sbm (
 
 	// Input Data //
 	// ---------- //
-	input logic [4:0] rs1_i,
-	input logic [4:0] rs2_i,
+	input logic [4:0] rs32_i,
+	input logic [4:0] rs16_i,
 	input logic [4:0] rd_i,
 	input logic [15:0] write_data_i,
 	input logic rd_h_sel_i,
-	input logic rs2_h_sel_i,
+	input logic rs16_h_sel_i,
 
 	// Output Data //
 	// ----------- //
-	output logic [31:0] rs1_do,
+	output logic [31:0] rs32_do,
 	`ifdef DEBUG
 		output logic [15:0] registers_od [1:0][31:0],
 	`endif
-	output logic [15:0] rs2_do
+	output logic [15:0] rs16_do
 
 );
 
 //!Cont Move extention logic outside to reuse for load/stores
 
 logic [15:0] registers [1:0][31:0];
-assign rs1_do = { registers[1][rs1_i], registers[0][rs1_i] };
-assign rs2_do = registers[rs2_h_sel_i][rs2_i];
+assign rs32_do = { registers[1][rs32_i], registers[0][rs32_i] };
+assign rs16_do = registers[rs16_h_sel_i][rs16_i];
 
 `ifdef DEBUG
 	assign registers_od = registers;

@@ -23,11 +23,11 @@ module exe_mem_wb_stage #(
 		
 	input logic [31:0] lsu_addr_i,
 	input logic [31:0] load_addr_bypass_i,
-	input logic [15:0] alu_a_i,
+	input logic [15:0] alu_b_i,
 	input logic [15:0] wb_i,
 	input logic [4:0] rd_i,
-	input logic [4:0] rs1_i,
-	input logic [4:0] rs2_i,
+	input logic [4:0] rs32_i,
+	input logic [4:0] rs16_i,
 
 	// Output Controls //
 	// --------------- //
@@ -35,12 +35,13 @@ module exe_mem_wb_stage #(
 
 	// Output Data //
 	// ----------- //
-	output logic [31:0] reg1_o,
+	output logic [31:0] reg32_o,
 	output logic cmp_result_o,
 	`ifdef DEBUG
 		output logic [15:0] registers_od [1:0][31:0],
 	`endif
-	output logic cmp_result_valid_o
+	output logic cmp_result_valid_o,
+	output logic shift_bigger_then_16_o
 
 );
 
@@ -63,10 +64,10 @@ logic [15:0] alu_out;
 //logic alu_cmp_result_valid;
 
 // Regfile
-logic [31:0] reg1_data;
-logic [15:0] reg2_data;
+logic [31:0] reg32_data;
+logic [15:0] reg16_data;
 logic rd_h_sel;
-logic rs2_h_sel;
+logic rs16_h_sel;
 logic regfile_write_en;
 logic [15:0] regfile_write_data;
 
@@ -84,7 +85,7 @@ load_store_unit load_store (
 
 	.dmem_apb(dmem_apb),
 
-	.reg1_i(reg1_data),
+	.reg1_i(reg32_data),
 	.addr_i(lsu_addr),
 
 	.ready_o(load_store_ready),
@@ -101,11 +102,12 @@ alu_sbm alu (
 
 	.op_i(cs_i.sel.alu_op),
 	.cmp_flip_i(cs_i.en.cmp_flip),
-	.a_i(alu_a_i),
-	.b_i(reg2_data),
+	.a_i(reg16_data),
+	.b_i(alu_b_i),
 	.result_o(alu_out),
 	.cmp_result_o(cmp_result_o),
-	.cmp_result_valid_o(cmp_result_valid_o)
+	.cmp_result_valid_o(cmp_result_valid_o),
+	.shift_bigger_then_16_o(shift_bigger_then_16_o)
 );
 
 
@@ -113,20 +115,20 @@ regfile_sbm regfile (
 	.clk(clk),
 	.rst_n(rst_n),
 
-	.rs1_i(rs1_i),
-	.rs2_i(rs2_i),
+	.rs32_i(rs32_i),
+	.rs16_i(rs16_i),
 	.rd_i(rd_i),
 	.write_i(regfile_write_en),
 	.write_data_i(regfile_write_data),
 	.rd_h_sel_i(rd_h_sel),
-	.rs2_h_sel_i(rs2_h_sel),
+	.rs16_h_sel_i(rs16_h_sel),
 
 	`ifdef DEBUG
 		.registers_od(registers_od),
 	`endif
 
-	.rs1_do(reg1_data),
-	.rs2_do(reg2_data)
+	.rs32_do(reg32_data),
+	.rs16_do(reg16_data)
 
 );
 
@@ -154,8 +156,8 @@ assign ready_o = load_store_ready;
 assign transfer_start = (valid_i && (first_cycle && cs_i.en.dmem_store)) | dmem_load_bypass_i;
 assign regfile_write_en = valid_i && cs_i.en.rf_write;
 assign rd_h_sel = !first_cycle ^ cs_i.en.wb_order_flip; 
-assign rs2_h_sel = !first_cycle && !cs_i.en.just_first_rs2_half;
-assign reg1_o = reg1_data;
+assign rs16_h_sel = (!first_cycle && !shift_bigger_then_16_o) ^ cs_i.en.rs16_half_order_flip;
+assign reg32_o = reg32_data;
 assign lsu_addr = dmem_load_bypass_i ? load_addr_bypass_i : lsu_addr_i;
 
 endmodule

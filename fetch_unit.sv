@@ -56,7 +56,7 @@ logic take_branch;
 logic [31:0] pc_current;
 logic [31:0] branch_alternative;
 logic [31:0] inst_buffer;
-logic inst_in_buffer_is_branch;
+logic inst_in_buffer_branch_jmp;
 
 enum logic [2:0] {
 	ST_INIT_FETCH, ST_FETCH,
@@ -157,7 +157,7 @@ always_ff @(posedge clk or negedge rst_n) begin
 					pc_o <= pc_current;
 					valid_o <= 1'b1;
 					pc_current <= fetch_address;
-					state_e <= inst_in_buffer_is_branch? ST_INIT_FETCH : ST_FETCH;
+					state_e <= inst_in_buffer_branch_jmp? ST_INIT_FETCH : ST_FETCH;
 				end
 			end
 			ST_FETCH: begin
@@ -230,7 +230,7 @@ always_ff @(posedge clk or negedge rst_n) begin
 					pc_o <= pc_current;
 					valid_o <= 1'b1;
 					pc_current <= fetch_address;
-					if (inst_in_buffer_is_branch) begin
+					if (inst_in_buffer_branch_jmp) begin
 						state_e <= branch_cmp_result_valid_i ? 
 							ST_INIT_FETCH : ST_INIT_FETCH_SPEC;
 					end else begin
@@ -248,7 +248,7 @@ end
 
 
 assign pc_next = pc_current + 4;
-assign inst_in_buffer_is_branch = (inst_buffer[6:0] == OPC_BRANCH);
+assign inst_in_buffer_branch_jmp = (inst_buffer[6:0] inside {OPC_BRANCH, OPC_JAL, OPC_JALR});
 always_comb begin
 	case (state_e)
 		ST_INIT_FETCH: begin
@@ -260,7 +260,7 @@ always_comb begin
 			end
 		end
 		ST_FULL_BUFFER: begin
-			imem_apb_start = ready_i && !inst_in_buffer_is_branch;
+			imem_apb_start = ready_i && !inst_in_buffer_branch_jmp;
 			if (jmp_i | (branch_i & take_branch)) begin
 				fetch_address = jmp_target_i;
 			end else begin
@@ -271,7 +271,7 @@ always_comb begin
 			imem_apb_start = 1'b1;
 			if (branch_cmp_result_valid_i) begin
 				if (branch_cmp_result_i == branch_taken_o) begin
-					fetch_address = pc_current;
+					fetch_address = (jmp_i || branch_i)  ? jmp_target_i : pc_current;
 				end else begin
 					fetch_address = branch_alternative;
 				end
@@ -282,8 +282,8 @@ always_comb begin
 		ST_FULL_BUFFER_SPEC: begin
 			imem_apb_start = ready_i;
 			if (branch_cmp_result_valid_i) begin
-				if (branch_cmp_result_i == branch_taken_o) begin
-					fetch_address = pc_current;
+				if (branch_cmp_result_i == branch_taken_o) begin 
+					fetch_address = (jmp_i || branch_i)  ? jmp_target_i : pc_current;
 				end else begin
 					fetch_address = branch_alternative;
 				end

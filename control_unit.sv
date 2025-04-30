@@ -42,6 +42,7 @@ always_comb begin
 			// Sel //
 			cs_o.dec.sel.inst_type = INST_TYPE_U;
 			cs_o.dec.sel.alu_wb_sel = ALU_WB_SEL_IMM;
+			cs_o.dec.sel.ser_start = SER_START_LH;
 			// Enable //
 			cs_o.dec.en.wb = ENABLE;
 
@@ -59,6 +60,8 @@ always_comb begin
 			// Sel //
 			cs_o.dec.sel.inst_type = INST_TYPE_U;
 			cs_o.dec.sel.alu_wb_sel = ALU_WB_SEL_ADDER;
+			cs_o.dec.sel.add_sel = DEC_ADD_SEL_PC;
+			cs_o.dec.sel.ser_start = SER_START_LH;
 			// Enable //
 			cs_o.dec.en.wb = ENABLE;
 
@@ -77,8 +80,9 @@ always_comb begin
 			cs_o.dec.sel.inst_type = INST_TYPE_J;
 			cs_o.dec.sel.add_sel = DEC_ADD_SEL_PC;
 			cs_o.dec.sel.alu_wb_sel = ALU_WB_SEL_PC;
+			cs_o.dec.sel.ser_start = SER_START_LH;
 			// Enable //
-			cs_o.dec.en.alu_a = ENABLE;
+			cs_o.dec.en.alu_b = ENABLE;
 			cs_o.dec.en.jmp = ENABLE;
 
 			// Execution Stage //
@@ -97,10 +101,11 @@ always_comb begin
 			cs_o.dec.sel.inst_type = INST_TYPE_I;
 			cs_o.dec.sel.add_sel = DEC_ADD_SEL_REG;
 			cs_o.dec.sel.alu_wb_sel = ALU_WB_SEL_PC;
+			cs_o.dec.sel.ser_start = SER_START_LH;
 			// Enable //
-			cs_o.dec.en.wb = ENABLE;
+			cs_o.dec.en.alu_b = ENABLE;
 			cs_o.dec.en.jmp = ENABLE;
-			cs_o.dec.en.reg_use = ENABLE;
+			cs_o.dec.en.reg32_use = ENABLE;
 
 			// Execution Stage //
 			// --------------- //
@@ -118,9 +123,12 @@ always_comb begin
 			// Sel //
 			cs_o.dec.sel.inst_type = INST_TYPE_B;
 			cs_o.dec.sel.alu_wb_sel = ALU_WB_SEL_REG;
+			cs_o.dec.sel.ser_start = SER_START_LH;
+			cs_o.dec.sel.add_sel = DEC_ADD_SEL_PC;
 			// Enable //
-			cs_o.dec.en.alu_a = ENABLE;
-			cs_o.dec.en.reg_use = ENABLE;
+			cs_o.dec.en.alu_b = ENABLE;
+			cs_o.dec.en.reg32_use = ENABLE;
+			cs_o.dec.en.reg16_use = ENABLE;
 			cs_o.dec.en.branch = ENABLE;
 
 			// Execution Stage //
@@ -133,9 +141,13 @@ always_comb begin
 				end
 				FNC3_BLT, FNC3_BGE: begin
 					cs_o.exe.sel.alu_op = ALU_OP_LT;
+					cs_o.dec.sel.ser_start = SER_START_UH;
+					cs_o.exe.en.rs16_half_order_flip = ENABLE;
 				end
 				FNC3_BLTU, FNC3_BGEU: begin
 					cs_o.exe.sel.alu_op = ALU_OP_LTU;
+					cs_o.dec.sel.ser_start = SER_START_UH;
+					cs_o.exe.en.rs16_half_order_flip = ENABLE;
 				end
 			endcase
 		end
@@ -148,7 +160,7 @@ always_comb begin
 			cs_o.dec.sel.add_sel = DEC_ADD_SEL_REG;
 			// Enable //
 			cs_o.dec.en.dmem_load_bypass = ENABLE;
-			cs_o.dec.en.reg_use = ENABLE;
+			cs_o.dec.en.reg32_use = ENABLE;
 
 			// Execution Stage //
 			// --------------- //
@@ -187,7 +199,7 @@ always_comb begin
 			cs_o.dec.sel.add_sel = DEC_ADD_SEL_REG;
 			// Enable //
 			cs_o.dec.en.lsu_addr = ENABLE;
-			cs_o.dec.en.reg_use = ENABLE;
+			cs_o.dec.en.reg32_use = ENABLE;
 
 			// Execution Stage //
 			// --------------- //
@@ -212,9 +224,11 @@ always_comb begin
 			// Sel //
 			cs_o.dec.sel.inst_type = opcode_i[5] ? INST_TYPE_R : INST_TYPE_I;
 			cs_o.dec.sel.alu_wb_sel = opcode_i[5] ? ALU_WB_SEL_REG : ALU_WB_SEL_IMM;
+			cs_o.dec.sel.ser_start = SER_START_LH;
 			// Enable //
-			cs_o.dec.en.alu_a = ENABLE;
-			cs_o.dec.en.reg_use = opcode_i[5];
+			cs_o.dec.en.alu_b = ENABLE;
+			cs_o.dec.en.reg16_use = ENABLE;
+			cs_o.dec.en.reg32_use = opcode_i[5];
 
 			// Execution Stage //
 			// --------------- //
@@ -230,10 +244,14 @@ always_comb begin
 				FNC3_OP_SLT: begin  
 					cs_o.exe.sel.alu_op = ALU_OP_LT;
 					cs_o.exe.en.wb_order_flip = ENABLE;
+					cs_o.dec.sel.ser_start = SER_START_UH;
+					cs_o.exe.en.rs16_half_order_flip = ENABLE;
 				end
 				FNC3_OP_SLTU: begin  
 					cs_o.exe.sel.alu_op = ALU_OP_LTU;
 					cs_o.exe.en.wb_order_flip = ENABLE;
+					cs_o.dec.sel.ser_start = SER_START_UH;
+					cs_o.exe.en.rs16_half_order_flip = ENABLE;
 				end
 				FNC3_OP_XOR: begin  
 					cs_o.exe.sel.alu_op = ALU_OP_XOR;
@@ -246,14 +264,14 @@ always_comb begin
 				end
 				FNC3_OP_SLL: begin  
 					cs_o.exe.sel.alu_op = ALU_OP_SLL;
-					cs_o.exe.en.just_first_rs2_half = ENABLE;
+					cs_o.dec.en.forward_just_one_half = ENABLE;
 				end
 				FNC3_OP_SRL_SRA: begin  
-					cs_o.dec.sel.ser_start = SER_START_UH;
-					cs_o.exe.en.wb_order_flip = ENABLE;
-					cs_o.exe.en.just_first_rs2_half = ENABLE;
 					cs_o.exe.sel.alu_op = funct7_i[5] ?
 					   	ALU_OP_SRA : ALU_OP_SRL;
+					cs_o.exe.en.rs16_half_order_flip = ENABLE;
+					cs_o.exe.en.wb_order_flip = ENABLE;
+					cs_o.dec.en.forward_just_one_half = ENABLE;
 				end
 			endcase
 		end
