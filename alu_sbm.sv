@@ -11,7 +11,8 @@ module alu_sbm (
 	// -------------- //
 		
 	input cs_alu_op op_i,
-	input cmp_flip_i,
+	input logic cmp_req_i,
+	input logic cmp_flip_i,
 
 	// Input Data //
 	// ---------- //
@@ -54,8 +55,6 @@ logic [15:0]
 logic [15:0] shift_filler_combinations [15:0];
 logic reduction_or_out;
 logic cmp_result_valid;
-logic cmp_op;
-logic cmp_both_positive_d;
 logic early_cmp_verdict;
 logic early_cmp_result;
 
@@ -70,8 +69,8 @@ logic early_cmp_result_d;
 // Sequential Logic // 
 // ---------------- // 
 
-always_ff @(posedge clk or negedge rst_n) begin
-	if (!rst_n | (first_cycle == 1'b0)) begin
+always_ff @(negedge first_cycle or negedge rst_n) begin
+	if (!rst_n) begin
 		carry_in <= 1'b0;
 	end else if (adder_used) begin
 		carry_in <= add_out[16];
@@ -80,12 +79,10 @@ end
 
 always_ff @(posedge clk or negedge rst_n) begin
 	if (!rst_n || !first_cycle) begin
-		cmp_both_positive_d <= 1'b0;
 		shift_in_d <= 1'b0;
 		early_cmp_verdict_d <= 1'b0;
 		early_cmp_result_d <= 1'b0;
 	end else if (first_cycle /*//! should gate? */ ) begin
-		cmp_both_positive_d <= (a_i[15] == b_i[15]) && (a_i[15] == 0);
 		shift_in_d <= shift_in;
 		early_cmp_verdict_d <= early_cmp_verdict;
 		early_cmp_result_d <= early_cmp_result;
@@ -97,8 +94,6 @@ end
 
 assign adder_used =
 	op_i inside {ALU_OP_ADD, ALU_OP_SUB, ALU_OP_EQ, ALU_OP_LT, ALU_OP_LTU};
-assign cmp_op =
-	op_i inside {ALU_OP_EQ, ALU_OP_LT, ALU_OP_LTU};
 assign add_out = add_a + add_b + add_carry_in;
 assign not_out = ~not_in;
 assign or_out = or_a | or_b;
@@ -127,12 +122,12 @@ assign shift_filler_out = shift_filler_combinations[shift_amount];
 
 
 assign shift_bigger_then_16_o = shift_bigger_then_16;
-assign cmp_result_valid_o = cmp_op && (early_cmp_verdict || !first_cycle);
+assign cmp_result_valid_o = cmp_req_i && (early_cmp_verdict || !first_cycle);
 
 always_comb begin
-	if (early_cmp_verdict_d) cmp_result_o = early_cmp_result_d;
-	else if (early_cmp_verdict) cmp_result_o = early_cmp_result;
-	else if (!first_cycle) cmp_result_o = result_o[0];
+	if (early_cmp_verdict_d) cmp_result_o = early_cmp_result_d ^ cmp_flip_i;
+	else if (early_cmp_verdict) cmp_result_o = early_cmp_result ^ cmp_flip_i;
+	else if (!first_cycle) cmp_result_o = result_o[0] ^ cmp_flip_i;
 end
 
 always_comb begin
@@ -197,9 +192,9 @@ always_comb begin
 				reduction_or_in = xor_out;
 				if (first_cycle && (reduction_or_out == 1'b1)) begin
 					early_cmp_verdict = 1'b1;
-					early_cmp_result = cmp_flip_i;
+					early_cmp_result = 1'b0;
 				end else if (!first_cycle) begin
-					result_o[0] = !reduction_or_out ^ cmp_flip_i;
+					result_o[0] = !reduction_or_out;
 				end
 			end else begin
 				result_o[0] = early_cmp_result_d;
@@ -215,9 +210,9 @@ always_comb begin
 				reduction_or_in = add_out;
 				if (first_cycle) begin
 					early_cmp_verdict = ((a_i[15] != b_i[15]) || (reduction_or_out == 1'b1));
-					early_cmp_result = ((a_i[15] != b_i[15]) ? a_i[15] : !add_out[16]) ^ cmp_flip_i;
+					early_cmp_result = ((a_i[15] != b_i[15]) ? a_i[15] : !add_out[16]);
 				end else begin
-					result_o[0] = !add_out[16] ^ cmp_flip_i ^ cmp_both_positive_d;
+					result_o[0] = !add_out[16];
 				end
 			end else begin
 				result_o[0] = early_cmp_result_d;
@@ -233,9 +228,9 @@ always_comb begin
 				reduction_or_in = add_out;
 				if (first_cycle && (reduction_or_out == 1'b1)) begin
 					early_cmp_verdict = 1'b1;
-					early_cmp_result = !add_out[16] ^ cmp_flip_i;
+					early_cmp_result = !add_out[16];
 				end else if (!first_cycle) begin
-					result_o[0] = !add_out[16] ^ cmp_flip_i;
+					result_o[0] = !add_out[16];
 				end
 			end else begin
 				result_o[0] = early_cmp_result_d;

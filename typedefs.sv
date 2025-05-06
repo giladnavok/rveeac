@@ -137,6 +137,7 @@ package typedefs;
 	typedef struct packed {
 		logic rf_write;
 		logic dmem_store;
+		logic cmp_req;
 		logic cmp_flip;
 		logic wb_order_flip;
 		logic rs16_half_order_flip;
@@ -234,6 +235,7 @@ package typedefs;
 	CS_EXE_EN_DEFAULT = '{
 			rf_write: DISABLE,
 			dmem_store: DISABLE,
+			cmp_req: DISABLE,
 			cmp_flip: DISABLE,
 			wb_order_flip: DISABLE,
 			rs16_half_order_flip: DISABLE

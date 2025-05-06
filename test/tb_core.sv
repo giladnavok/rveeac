@@ -260,7 +260,7 @@ initial begin
 
     /* Test BEQ */
 
-	// Should not predict taken and not take - not equal on first cycle
+	// Should predict not taken and not take - not equal on first cycle
 	#8 inst = 32'h01078c63; // BEQ x15, x16, 24
 	#4 branch_pc = pc;
 	#4 inst = NOP;
@@ -324,7 +324,151 @@ initial begin
 	#4 assert(pc == branch_pc + 8);
 	#4 assert(registers[16] == 8*66408);
 
+    /* Test BNE */
+
+	// Should predict not taken but take - not equal on first cycle
+	#8 inst = 32'h01079c63; // BNE x15, x16, 24
+	#4 branch_pc = pc;
+	// This instruction should enter the pipe and not execute
+	#4 inst = 32'h01080833; // add x16, x16, x16 /* x16  = 8*66408 */
+	#4 assert(pc == branch_pc + 4);
+	#4 inst = NOP; 
+	#4 assert(pc == branch_pc + 24);
+	#4 inst = NOP;
+	#4 assert(pc == branch_pc + 28);
+	#4 inst = NOP;
+	#4 assert(pc == branch_pc + 32);
+	#4 assert(registers[16] == 8*66408);
+
+	// Should predict not taken but take - not equal on second cycle
+	#8 inst = 32'h00c69c63; // BNE x12, x13, 24
+	#4 branch_pc = pc;
+	// This instruction should enter the pipe and not execute
+	#4 inst = 32'h01080833; // add x16, x16, x16 /* x16  = 8*66408 */
+	#4 assert(pc == branch_pc + 4);
+	#4 inst = NOP; 
+	#4 assert(pc == branch_pc + 24);
+	#4 inst = NOP;
+	#4 assert(pc == branch_pc + 28);
+	#4 inst = NOP;
+	#4 assert(pc == branch_pc + 32);
+	#4 assert(registers[16] == 8*66408);
+
+	// Should predict not taken and not take
+	#8 inst = 32'h01081c63; // BNE x16, x16, 24
+	#4 branch_pc = pc;
+	#4 inst = NOP;
+	#8 inst = NOP;
+	#8 inst = NOP;
+	#4 assert(pc == branch_pc + 12); #4;
+
+
+	// Should predict taken and not take
+	#8 inst = 32'hff0814e3; // BNE x16, x16, -24
+	#4 branch_pc = pc;
+	// This instruction should enter the pipe and not execute
+	#4 inst = 32'h01080833; // add x16, x16, x16 /* x16  = 8*66408 */
+	#4 assert(pc == branch_pc - 24);
+	#4 inst = NOP; 
+	#4 assert(pc == branch_pc + 4);
+	#4 inst = NOP; 
+	#4 assert(pc == branch_pc + 8);
+	#4 assert(registers[16] == 8*66408);
+
+	// Should predict taken and take - not equal on first cycle
+	#8 inst = 32'hff0794e3; // BNE x15, x16, -24
+	#4 branch_pc = pc;
+	// This instruction should enter the pipe and execute
+	#4 inst = 32'h01080833; // add x16, x16, x16 /* x16  = 8*66408 */
+	#4 assert(pc == branch_pc - 24);
+	#4 inst = NOP; 
+	#4 assert(pc == branch_pc - 20);
+	#4 inst = NOP; 
+	#4 assert(pc == branch_pc - 16);
+	#4 assert(registers[16] == 16*66408);
+
+	// Should predict taken and take - not equal on second cycle
+	#8 inst = 32'hfec694e3; // BNE x12, x13, -24
+	#4 branch_pc = pc;
+	// This instruction should enter the pipe and execute
+	#4 inst = 32'h01080833; // add x16, x16, x16 /* x16  = 8*66408 */
+	#4 assert(pc == branch_pc - 24);
+	#4 inst = NOP; 
+	#4 assert(pc == branch_pc - 20);
+	#4 inst = NOP; 
+	#4 assert(pc == branch_pc - 16);
+	#4 assert(registers[16] == 32*66408);
+
+
+    /* Test BLT */
+
+	// Current registers state
+	// x15 < x16 both positive
+	// x13 < x12 both positive
+	// x31 < x29 both negative
+	// x31 < x15 neg < positive
+
+	// LT - both positive
+	// Should predict not taken and not take - not lower then on first cycle
+	#8 inst = 32'h00f84c63; // BLT x16, x15, 24
+	#4 branch_pc = pc;
+	#4 inst = NOP;
+	#8 inst = NOP;
+	#8 inst = NOP;
+	#4 assert(pc == branch_pc + 12); #4;
+
+	// Should predict not taken and not take - not lower then on second cycle
+	#8 inst = 32'h00d64c63; // BLT x12, x13, 24
+	#4 branch_pc = pc;
+	#4 inst = NOP;
+	#8 inst = NOP;
+	#8 inst = NOP;
+	#4 assert(pc == branch_pc + 12); #4;
+
+	// Should predict not taken but take  - not lower then on first cycle
+	#8 inst = 32'h0107cc63; // BLT x15, x16, 24
+	#4 branch_pc = pc;
+	// This instruction should enter the pipe and not execute
+	#4 inst = 32'h01080833; // add x16, x16, x16 /* x16  = 8*66408 */
+	#4 assert(pc == branch_pc + 4);
+	#4 inst = NOP; 
+	#4 assert(pc == branch_pc + 24);
+	#4 inst = NOP;
+	#4 assert(pc == branch_pc + 28);
+	#4 inst = NOP;
+	#4 assert(pc == branch_pc + 32);
+	#4 assert(registers[16] == 32*66408);
+
+	// Should predict not taken but take  - not lower then on second cycle
+	#8 inst = 32'h00c6cc63; // BLT x13, x12, 24
+	#4 branch_pc = pc;
+	// This instruction should enter the pipe and not execute
+	#4 inst = 32'h01080833; // add x16, x16, x16 /* x16  = 8*66408 */
+	#4 assert(pc == branch_pc + 4);
+	#4 inst = NOP; 
+	#4 assert(pc == branch_pc + 24);
+	#4 inst = NOP;
+	#4 assert(pc == branch_pc + 28);
+	#4 inst = NOP;
+	#4 assert(pc == branch_pc + 32);
+	#4 assert(registers[16] == 32*66408);
+
+	//!Cont : taken - not taken ; taken - taken
+
+
+	// stalls
+
+	#8 inst = 32'h00102023; // sw x1, 0(x0)
+	#8 inst = 32'h00002103; // lw x2, 0(x0)
+	#8 inst = NOP;
+	#8 inst = NOP;
+	#8 inst = NOP;
+	#8 assert(mem[0] == registers[1]);
+	#8 assert(registers[2] == registers[1]);
+	
+
 	$stop;
+
 end
 
 endmodule

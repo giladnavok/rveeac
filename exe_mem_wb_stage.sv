@@ -50,8 +50,10 @@ module exe_mem_wb_stage #(
 //logic first_cycle;
 
 // LSU 
+logic load_store_write;
 logic load_store_ready;
 logic load_store_valid;
+logic load_store_half;
 logic load_store_err;
 logic load_store_load_data;
 logic transfer_start;
@@ -71,15 +73,20 @@ logic rs16_h_sel;
 logic regfile_write_en;
 logic [15:0] regfile_write_data;
 
+// Internal Registers //
+
+logic first_cycle_d;
+
 // Submodule Instances //
 // ------------------- //
 
 load_store_unit load_store (
 	.clk(clk),
 	.rst_n(rst_n),
+	.first_cycle(first_cycle),
 
 	.start_i(transfer_start),
-	.dir_i(cs_i.en.dmem_store),
+	.dir_i(load_store_write),
 	.size_i(cs_i.sel.wb_store_size),
 	.load_ext_i(cs_i.sel.wb_ext),
 
@@ -90,6 +97,7 @@ load_store_unit load_store (
 
 	.ready_o(load_store_ready),
 	.valid_o(load_store_valid),
+	.half_o(load_store_half),
 	.err_o(load_store_err),
 
 	.ldata_o(lsu_out)
@@ -101,6 +109,7 @@ alu_sbm alu (
 	.first_cycle(first_cycle),
 
 	.op_i(cs_i.sel.alu_op),
+	.cmp_req_i(cs_i.en.cmp_req),
 	.cmp_flip_i(cs_i.en.cmp_flip),
 	.a_i(reg16_data),
 	.b_i(alu_b_i),
@@ -135,13 +144,11 @@ regfile_sbm regfile (
 // Logic // 
 // ----- // 
 
-//// Generate first_cycle signal
-//always_ff @(posedge clk or negedge rst_n) begin
-//	if (!rst_n) first_cycle <= 1'b0;
-//	else if (!valid_i) first_cycle <= 1'b1;
-//	else if (ready_o && valid_i) first_cycle <= 1'b1;
-//	else first_cycle <= 1'b0;
-//end
+always_ff @(posedge clk or negedge rst_n) begin
+	if (!rst_n) first_cycle_d <= 1'b0;
+	else first_cycle_d <= first_cycle;
+end
+
 
 // Regfile WB data mux
 always_comb begin
@@ -152,14 +159,26 @@ always_comb begin
 	endcase
 end
 
-assign ready_o = load_store_ready;
+assign ready_o = load_store_ready && !first_cycle;
 assign transfer_start = (valid_i && (first_cycle && cs_i.en.dmem_store)) | dmem_load_bypass_i;
-assign regfile_write_en = valid_i && cs_i.en.rf_write;
-assign rd_h_sel = !first_cycle ^ cs_i.en.wb_order_flip; 
 assign rs16_h_sel = (!first_cycle && !shift_bigger_then_16_o) ^ cs_i.en.rs16_half_order_flip;
 assign reg32_o = reg32_data;
-assign lsu_addr = dmem_load_bypass_i ? load_addr_bypass_i : lsu_addr_i;
+assign lsu_addr = cs_i.en.dmem_store ? lsu_addr_i : load_addr_bypass_i;
+assign load_store_write = cs_i.en.dmem_store;
 
+always_comb begin
+	regfile_write_en = 1'b0;
+	rd_h_sel = 1'b0;
+	if (valid_i && cs_i.en.rf_write) begin
+		if (cs_i.sel.wb == WB_SEL_LSU) begin
+			regfile_write_en = load_store_valid;
+			rd_h_sel = load_store_half;
+		end else begin
+			regfile_write_en = first_cycle || first_cycle_d;
+			rd_h_sel = !first_cycle ^ cs_i.en.wb_order_flip; 
+		end
+	end
+end
 endmodule
 
 

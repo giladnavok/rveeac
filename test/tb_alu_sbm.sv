@@ -177,6 +177,9 @@ initial begin
 		#1 assert (out == exp);
 
 		#1 op = ALU_OP_LT; flip = 1'b0;
+		if ($random % 4) begin
+			A[31:15] = B[31:15];
+		end
 		exp = $signed(A) < $signed(B);
 		serialize(op, A, B, outh, clk, ah, bh, first_cycle, shift_bigger_then_16, out, flip_half_order, flip_out_half_order);
 		#1 assert (out == exp);

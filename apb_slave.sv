@@ -1,15 +1,16 @@
 
 module apb_slave # (
+	SIZE = 64,
 	INIT_FILENAME = "",
 	SET_INDEX = 1'b0
 ) (
 	input logic clk,
 	input logic rst_n,
 	apb_if.slave apb,
-	output logic [31:0] mem_o [63:0]
+	output logic [31:0] mem_o [SIZE - 1:0]
 );
 
-logic [31:0] mem [63:0];
+logic [31:0] mem [SIZE - 1:0];
 assign mem_o = mem;
 
 initial begin
@@ -18,7 +19,7 @@ initial begin
 	end 
 end
 
-assign apb.rdata = (apb.sel && apb.enable && apb.write == 1'b0) ? mem[(apb.addr/4) % 64] : 32'bx;
+assign apb.rdata = (apb.sel && apb.enable && apb.write == 1'b0) ? mem[(apb.addr/4) % SIZE] : 32'bx;
 assign apb.ready = (apb.sel && apb.enable);
 assign apb.slverr = 1'b0;
 
@@ -26,11 +27,11 @@ always_ff @(posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		if (INIT_FILENAME == "") begin
 			if (SET_INDEX) begin
-				for (int i = 0; i < 64; i++) begin
+				for (int i = 0; i < SIZE; i++) begin
 					mem[i] = i + 32'hffff0000;
 				end
 			end else begin
-				for (int i = 0; i < 64; i++) begin
+				for (int i = 0; i < SIZE; i++) begin
 					mem[i] = '0;
 				end
 			end

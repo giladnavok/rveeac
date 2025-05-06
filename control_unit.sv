@@ -134,6 +134,7 @@ always_comb begin
 			// Execution Stage //
 			// --------------- //
 			// Sel //
+			cs_o.exe.en.cmp_req = ENABLE;
 			cs_o.exe.en.cmp_flip = funct3_i[0];
 			case (funct3_branch_e'(funct3_i))
 				FNC3_BEQ, FNC3_BNE: begin
@@ -239,7 +240,7 @@ always_comb begin
 			cs_o.exe.en.rf_write = ENABLE;
 			case (funct3_operation_e'(funct3_i))
 				FNC3_OP_ADD: begin  
-					cs_o.exe.sel.alu_op = ALU_OP_ADD;
+					cs_o.exe.sel.alu_op = (funct7_i[5] && opcode_i[5])  ? ALU_OP_SUB : ALU_OP_ADD;
 				end
 				FNC3_OP_SLT: begin  
 					cs_o.exe.sel.alu_op = ALU_OP_LT;

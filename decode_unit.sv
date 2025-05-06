@@ -44,8 +44,12 @@ module decode_unit (
 // -------------- //
 	
 logic first_cycle;
+logic reg32_used_in_first_cycle;
+
 logic stall;
-	
+logic store_load_stall;
+logic full_read_after_write;
+logic half_read_after_write;
 
 // Decode 
 opcode_e opcode;
@@ -73,6 +77,7 @@ logic is_immediate_op;
 
 logic [4:0] rs32_d;
 logic [4:0] rs16_d;
+logic stall_d;
 logic ready_i_d;
 logic valid_i_d;
 
@@ -123,10 +128,45 @@ always_comb begin
 	endcase
 end
 
+assign reg32_used_in_first_cycle = 
+	cs.dec.en.dmem_load_bypass ||
+	cs.dec.en.lsu_addr ||
+	cs.dec.en.jmp ||
+	cs.dec.en.branch
+;
+assign store_load_stall = 
+	( 
+		cs.dec.en.dmem_load_bypass && 
+		cs_exe_o.en.dmem_store && 
+		!ready_i_d
+	);
+
+assign full_read_after_write = 
+	((rd_o != 5'b0) && 
+		(
+			(rd_o == rs1) && 
+			first_cycle && 
+			cs_exe_o.en.rf_write && 
+			reg32_used_in_first_cycle
+		)
+	);
+
+assign half_read_after_write = 
+	((rd_o != 5'b0) && 
+		(
+			(rd_o == rs2) && 
+			first_cycle && 
+			cs.dec.en.alu_b && 
+			(cs_exe_o.en.wb_order_flip != (cs.dec.sel.ser_start == SER_START_UH))
+		)
+	);
+		
 assign stall = 
-	(cs.dec.en.dmem_load_bypass && !cs_exe_o.en.dmem_store && !ready_i_d) ||
-	(cs_exe_o.en.rf_write && (rd_o == rs1) && !ready_i_d ) ||
-	(cs.dec.en.alu_b && (rd_o == rs2) && cs_exe_o.en.wb_order_flip && !ready_i_d);
+	(store_load_stall ||
+	full_read_after_write ||
+	half_read_after_write)
+	&& !stall_d && valid_o;
+;
 
 assign is_immediate_op = cs.dec.en.alu_b && (cs.dec.sel.alu_wb_sel == ALU_WB_SEL_IMM);
 assign dmem_load_addr_bypass_o = add_out;
@@ -135,18 +175,20 @@ assign dmem_load_addr_bypass_o = add_out;
 always_ff @(posedge clk or negedge rst_n) begin
 	if (!rst_n || !valid_i) first_cycle <= 1'b1;
 	else if (stall) first_cycle <= first_cycle;
-	else if (ready_o) first_cycle <= 1'b1; //! why valid_i?
+	else if (ready_o) first_cycle <= 1'b1; 
 	else first_cycle <= 1'b0;
 end
 
 // Sample delayed signals
 always_ff @(posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
+		stall_d <= 1'b0;
 		ready_i_d <= 1'b0;
 		valid_i_d <= 1'b0;
 		rs16_d <= 5'b0;
 		rs32_d <= 5'b0;
 	end else begin
+		stall_d <= stall;
 		ready_i_d <= ready_i;
 		valid_i_d <= valid_i;
 		rs16_d <= rs16_o;
@@ -168,14 +210,14 @@ assign rs2 = inst_i[24:20];
 // ---------------- //
 
 assign valid_o = valid_i && valid_i_d;
-assign ready_o = !first_cycle || !valid_i;
+assign ready_o = ( !first_cycle || !valid_i ) && !stall && !stall_d;
 assign jmp_o = first_cycle && cs.dec.en.jmp && valid_i;
-assign branch_o = first_cycle && cs.dec.en.branch && valid_i;
-assign dmem_load_bypass_o = cs.dec.en.dmem_load_bypass;
+assign branch_o = first_cycle && !stall_d && cs.dec.en.branch && valid_i;
+assign dmem_load_bypass_o = cs.dec.en.dmem_load_bypass && valid_i && first_cycle && !stall;
 assign jmp_target_o = add_out;
 
 always_comb begin
-	if (cs.dec.en.reg32_use) begin
+	if (cs.dec.en.reg32_use && !store_load_stall) begin
 		if (cs.exe.en.dmem_store && !first_cycle) begin
 			rs32_o = rs2;
 		end else begin
@@ -194,9 +236,9 @@ always_ff @(posedge clk or negedge rst_n) begin
 		rd_o <= '0;
 		rs16_o <= '0;
 		cs_exe_o <= '0;
-		exe_first_cycle_o <= 1'b1;
+		exe_first_cycle_o <= 1'b0;
 	end else begin
-		if (ready_i || ready_i_d) begin
+		if ((!stall && (ready_i || ready_i_d) && (valid_i || valid_i_d))) begin
 			exe_first_cycle_o <= first_cycle;
 			if (first_cycle && cs.dec.en.lsu_addr) begin
 				lsu_addr_o <= add_out;
@@ -216,6 +258,8 @@ always_ff @(posedge clk or negedge rst_n) begin
 			if (cs.exe.en.rf_write) begin
 				rd_o <= rd;
 			end
+		end else begin
+			exe_first_cycle_o <= 1'b0;
 		end
 	end
 end

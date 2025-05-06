@@ -5,6 +5,7 @@ module load_store_unit (
 	// --------------- //
 	input logic clk,
 	input logic rst_n,
+	input logic first_cycle,
 
 	// Input Controls //
 	// -------------- //
@@ -23,6 +24,7 @@ module load_store_unit (
 
 	// Output Controls //
 	// --------------- //
+	output logic half_o,
 	output logic ready_o,
 	output logic valid_o,
 	output logic err_o,
@@ -31,6 +33,21 @@ module load_store_unit (
 	// ----------- //
 	output logic [15:0] ldata_o
 );
+
+logic [31:0] write_data;
+
+// Internal Registers //
+
+logic [31:0] reg1_d;
+
+
+localparam WRITE = 1'b1;
+always_ff @(negedge (first_cycle && (dir_i == WRITE)) ) begin
+	reg1_d <= reg1_i;
+end
+
+assign write_data = first_cycle ? reg1_i : reg1_d;
+
 // Add mux to execution stage to mux wdata to 16 bit regfile read port for
 // SH/SB
 
@@ -54,6 +71,7 @@ logic [15:0] ldata_uh_d;
 logic valid;
 logic valid_d;
 assign valid_o = valid | valid_d;
+assign half_o = valid_d;
 
 assign ldata_o = valid_d ? ldata_uh_d : ldata_lh;
 
@@ -66,9 +84,12 @@ always_ff @(posedge clk or negedge rst_n) begin
 		if (valid) begin
 			case (size_i) 
 				SIZE_W: ldata_uh_d <= ldata[31:16];
-				SIZE_H, SIZE_B: ldata_uh_d <= 
+				SIZE_H: ldata_uh_d <= 
 					(load_ext_i == EXT_Z) ?
 				   	16'b0 : {16{ldata[15]}};
+				SIZE_B: ldata_uh_d <= 
+					(load_ext_i == EXT_Z) ?
+				   	16'b0 : {16{ldata[7]}};
 			endcase
 		end
 	end
@@ -84,7 +105,7 @@ apb_controller_sbm dmem_apb_controller (
 
 	.apb(dmem_apb),
 
-	.wdata_i(reg1_i),
+	.wdata_i(write_data),
 	.addr_i(addr_i),
 
 	.ready_o(ready_o),
