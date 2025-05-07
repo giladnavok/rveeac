@@ -1,37 +1,34 @@
 import typedefs::*;
 
 module alu_sbm (
-	// General Signals //
-	// --------------- //
-	input logic clk,
-	input logic rst_n,
-	input logic first_cycle,
+	// ------- General Signals -------
 
-	// Input Controls //
-	// -------------- //
-		
-	input cs_alu_op op_i,
-	input logic cmp_req_i,
-	input logic cmp_flip_i,
+	input logic clk, 					///< Rising-edge refernce clock
+	input logic rst_n, 					///< Async active-low reset
 
-	// Input Data //
-	// ---------- //
+	// ----------- Input Controls --------
 		
-	input logic [15:0] a_i,
-	input logic [15:0] b_i,
+	input logic first_cycle,			///< Is first execution cycle
+	input cs_alu_op op_i, 				///< Arithmetic operation selector
+	input logic cmp_req_i, 				///< Compare result request 
+	input logic cmp_flip_i, 			///< Flip compare result (BEQ->BNE)
 
-	// Output Data //
-	// ----------- //
+	// ----------- Input Data --------
 		
-	
-	output logic shift_bigger_then_16_o,
-	output logic [15:0] result_o,
-	output logic cmp_result_o,
-	output logic cmp_result_valid_o
+	input logic [15:0] a_i, 			///< Input data A
+	input logic [15:0] b_i, 			///< Input data B
+
+	// ----------- Output Data --------
+
+	output logic shift_bigger_then_16_o, ///< Signal ID stage to not forward lower half
+	output logic [15:0] result_o, 		 ///< Operation result
+	output logic cmp_result_o,			 ///<  Comparison result
+	output logic cmp_result_valid_o 	 ///< Is comparison result is valid
 );
 
-// Internal Wires //
-// -------------  // 
+// ===============================
+//			Internal Wires        
+// ===============================
 
 logic [15:0] 
 	add_a, add_b;
@@ -59,20 +56,22 @@ logic early_cmp_verdict;
 logic early_cmp_result;
 
 
-// Internal Registers //
-// ------------------  // 
+// ===============================
+//			Internal Registers        
+// ===============================
 logic [15:0] shift_in_d;
 logic carry_in;
 logic early_cmp_verdict_d;
 logic early_cmp_result_d;
 
-// Sequential Logic // 
-// ---------------- // 
+// ===============================
+//			Sequential Logic        
+// ===============================
 
-always_ff @(negedge first_cycle or negedge rst_n) begin
+always_ff @(posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		carry_in <= 1'b0;
-	end else if (adder_used) begin
+	end else if (adder_used && first_cycle) begin
 		carry_in <= add_out[16];
 	end
 end
@@ -89,8 +88,9 @@ always_ff @(posedge clk or negedge rst_n) begin
 	end
 end
 
-// Combinatorical  Logic // 
-// --------------------- // 
+// ===============================
+//		Combinatorical Logic        
+// ===============================
 
 assign adder_used =
 	op_i inside {ALU_OP_ADD, ALU_OP_SUB, ALU_OP_EQ, ALU_OP_LT, ALU_OP_LTU};
@@ -108,6 +108,7 @@ assign shift_used = op_i inside {ALU_OP_SRA, ALU_OP_SRL, ALU_OP_SLL};
 assign reverse_a_out = {<<{reverse_a_in}};
 assign reverse_b_out = {<<{reverse_b_in}};
 
+//! Chat says this synthesies 16 muxes
 genvar i;
 generate 
 for (i = 0; i < 16; i++) begin

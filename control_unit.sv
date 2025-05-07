@@ -21,10 +21,10 @@ module control_unit (
 );
 
 cs_dec_sel_s dec_sel_d;
-always_ff @(negedge first_cycle or negedge rst_n) begin
+always_ff @(posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		dec_sel_d <= '0;
-	end else begin
+	end else if (first_cycle) begin
 		dec_sel_d <= cs_o.dec.sel;
 	end
 end
