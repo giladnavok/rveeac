@@ -25,10 +25,10 @@ logic dec_valid;
 logic dec_jmp;
 logic dec_branch;
 logic dec_dmem_load_bypass;
-logic [31:0] dec_dmem_load_addr_bypass;
+logic [31:0] dec_lsu_load_addr_bypass;
 cs_exe_s dec_cs_exe_out;
 logic [31:0] dec_jmp_target_out;
-logic [31:0] dec_lsu_addr_out;
+logic [31:0] dec_lsu_store_addr_out;
 logic [15:0] dec_alu_b_out;
 logic [15:0] dec_wb_data_out;
 logic [4:0] dec_rd_out;
@@ -105,8 +105,8 @@ decode_unit decode (
 	.dmem_load_bypass_o(dec_dmem_load_bypass),
 	.exe_first_cycle_o(exe_first_cycle),
 
-	.lsu_addr_o(dec_lsu_addr_out),
-	.dmem_load_addr_bypass_o(dec_dmem_load_addr_bypass),
+	.lsu_store_addr_o(dec_lsu_store_addr_out),
+	.lsu_load_addr_bypass_o(dec_lsu_load_addr_bypass),
 	.jmp_target_o(dec_jmp_target_out),
 	.alu_b_o(dec_alu_b_out),
 	.wb_o(dec_wb_data_out),
@@ -126,8 +126,8 @@ exe_mem_wb_stage exe_mem_wb (
 
 	.dmem_apb(dmem_apb),
 
-	.lsu_addr_i(dec_lsu_addr_out),
-	.load_addr_bypass_i(dec_dmem_load_addr_bypass),
+	.lsu_store_addr_i(dec_lsu_store_addr_out),
+	.load_addr_bypass_i(dec_lsu_load_addr_bypass),
 	.alu_b_i(dec_alu_b_out),
 	.wb_i(dec_wb_data_out),
 	.rd_i(dec_rd_out),

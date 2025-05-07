@@ -1,47 +1,43 @@
 import typedefs::*;
 
 module decode_unit (
-	// General Signals //
-	// --------------- //
-	input logic clk,
-	input logic rst_n,
+	// --------- General Signals --------
+	input logic clk, 							///< Rising-edge reference clock
+	input logic rst_n, 							///< Async active-low reset
 
-	// Input Controls //
-	// -------------- //
-	input logic ready_i,
-	input logic valid_i,
+	// --------- Input Controls  --------
+	input logic ready_i, 						///< Execution stage can accept controls and data
+	input logic valid_i, 						///< Input data from IF stage is valid
 	
-	// Input Data //
-	// ---------- //
-		
-	input logic [31:0] inst_i,
-	input logic [31:0] pc_i,
-	input logic [31:0] reg32_i,
 
-	// Output Controls //
-	// --------------- //
-	output cs_exe_s cs_exe_o,
-	output logic jmp_o,
-	output logic branch_o,
-	output logic ready_o,
-	output logic valid_o,
-	output logic dmem_load_bypass_o,
-	output logic exe_first_cycle_o,
+	// --------- Input Data  ------------
+	input logic [31:0] inst_i, 					///< Instruction from IF stage
+	input logic [31:0] pc_i, 					///< Instruction's PC from IF stage
+	input logic [31:0] reg32_i, 				///< 32 bit register port data.
 
-	// Output Data //
-	// ----------- //
-	output logic [31:0] lsu_addr_o,
-	output logic [31:0] dmem_load_addr_bypass_o,
-	output logic [31:0] jmp_target_o,
-	output logic [15:0] alu_b_o,
-	output logic [15:0] wb_o,
-	output logic [4:0] rd_o,
-	output logic [4:0] rs32_o,
-	output logic [4:0] rs16_o
+	// --------- Output Controls --------
+	output cs_exe_s cs_exe_o, 					///< Control signals for execution stage
+	output logic jmp_o, 						///< Jump signal for IF stage.
+	output logic branch_o, 						///< Branch signal for IF stage
+	output logic ready_o, 						///< Instruction decode finished, ready for next instruction
+	output logic valid_o, 						///< Control signals and output data for execution stage are valid
+	output logic dmem_load_bypass_o, 			///< Bypass to execution stage - start read transfer
+	output logic exe_first_cycle_o, 			///< First cycle signal for execution stage
+
+	// --------- Output Data  -----------
+	output logic [31:0] lsu_store_addr_o, 		///< Store address for LSU - FF
+	output logic [31:0] lsu_load_addr_bypass_o, ///< Bypass to execution stage - Load address for LSU - Combinatorical
+	output logic [31:0] jmp_target_o, 			///< Jump target for IF stage.
+	output logic [15:0] alu_b_o, 				///< ALU input b data for execution stage.
+	output logic [15:0] wb_o, 					///< WB data fro execution stage.
+	output logic [4:0] rd_o, 					///< Register file write port index.
+	output logic [4:0] rs32_o, 					///< Register file 32 bit read port index.
+	output logic [4:0] rs16_o 					///< Register file 16 bit read port index.
 );
 
-// Internal Wires //
-// -------------- //
+// ===============================
+//			Internal Wires        
+// ===============================
 	
 logic first_cycle;
 logic reg32_used_in_first_cycle;
@@ -69,11 +65,12 @@ logic [31:0] serializer_in;
 logic [15:0] serializer_out;
 logic serializer_en, forward_lower_half;
 
-logic is_immediate_op;
+//logic is_immediate_op;
 
 
-// Internal Registers //
-// ----------------- //
+// ===============================
+//			Internal Registers        
+// ===============================
 
 logic [4:0] rs32_d;
 logic [4:0] rs16_d;
@@ -82,8 +79,9 @@ logic ready_i_d;
 logic valid_i_d;
 
 
-// Submodule Instances //
-// ------------------- //
+// ===============================
+//			Sub-modules
+// ===============================
 
 control_unit control (
 	.clk(clk),
@@ -103,6 +101,10 @@ imm_gen_sbm imm_gen (
 	.inst_i(inst_i),
 	.imm_o(imm)
 );
+
+// ===============================
+//			Internal Logic
+// ===============================
 
 // Adder Logic  //
 // ------------ //
@@ -128,6 +130,8 @@ always_comb begin
 	endcase
 end
 
+// Stall logic //
+// ----------- //
 assign reg32_used_in_first_cycle = 
 	cs.dec.en.dmem_load_bypass ||
 	cs.dec.en.lsu_addr ||
@@ -168,8 +172,7 @@ assign stall =
 	&& !stall_d && valid_o;
 ;
 
-assign is_immediate_op = cs.dec.en.alu_b && (cs.dec.sel.alu_wb_sel == ALU_WB_SEL_IMM);
-assign dmem_load_addr_bypass_o = add_out;
+//assign is_immediate_op = cs.dec.en.alu_b && (cs.dec.sel.alu_wb_sel == ALU_WB_SEL_IMM);
 
 // Generate first_cycle
 always_ff @(posedge clk or negedge rst_n) begin
@@ -215,7 +218,9 @@ assign jmp_o = first_cycle && cs.dec.en.jmp && valid_i;
 assign branch_o = first_cycle && !stall_d && cs.dec.en.branch && valid_i;
 assign dmem_load_bypass_o = cs.dec.en.dmem_load_bypass && valid_i && first_cycle && !stall;
 assign jmp_target_o = add_out;
+assign lsu_load_addr_bypass_o = add_out;
 
+// Assign rs32_o
 always_comb begin
 	if (cs.dec.en.reg32_use && !store_load_stall) begin
 		if (cs.exe.en.dmem_store && !first_cycle) begin
@@ -230,7 +235,7 @@ end
 
 always_ff @(posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
-		lsu_addr_o <= '0;
+		lsu_store_addr_o <= '0;
 		alu_b_o <= '0;
 		wb_o <= '0;
 		rd_o <= '0;
@@ -241,7 +246,7 @@ always_ff @(posedge clk or negedge rst_n) begin
 		if ((!stall && (ready_i || ready_i_d) && (valid_i || valid_i_d))) begin
 			exe_first_cycle_o <= first_cycle;
 			if (first_cycle && cs.dec.en.lsu_addr) begin
-				lsu_addr_o <= add_out;
+				lsu_store_addr_o <= add_out;
 			end
 			if (cs.dec.en.alu_b && !(cs.dec.en.forward_just_one_half && !first_cycle)) begin 
 				alu_b_o <= serializer_out;
