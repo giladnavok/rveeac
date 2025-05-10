@@ -25,33 +25,6 @@ function automatic logic [31:0] rot_word
     rot_word =  {w[23:0], w[31:24]};
 endfunction
 
-//function automatic logic [127:0] gen_next_key
-//  (
-//    input logic [3:0]   round,
-//    input logic [127:0] key
-//  );
-//  begin
-
-//    logic [31:0] ck0, ck1, ck2, ck3; // cr = current key
-//    ck0 = key[127:96];
-//    ck1 = key[95:64];
-//    ck2 = key[63:32];
-//    ck3 = key[31:0];
-
-//    logic [31:0] temp;
-//    temp = s_word(rot_word(ck0)); // s_word = aes s_box , rot_word = rotate word by one byte left
-//    temp = temp ^ (round_consts[round] << 24);
-
-//    logic [31:0] nk0, nk1, nk2, nk3; // nk = next key
-//    nk0 = ck0 ^ tmp;
-//    nk1 = ck1 ^ nk0;
-//    nk2 = ck2 ^ nk1;
-//    nk3 = ck3 ^ nk2;
-
-//    return {nk0, nk1, nk2, nk3}
-    
-//  end
-//endfunction : gen_next_key
 
 // 4-bit carry-less multiply in GF(2^4) mod x^4+x+1 (0x13)
 function automatic logic [3:0] gf16_mul(
@@ -87,9 +60,5 @@ function logic [7:0] gfmul3(
 );
   gfmul3 = {b[6:0],1'b0} ^ (8'h1B & {8{b[7]}}) ^ b;
 endfunction
-
-// --------------------------------------------------------------------------
-// You can add more functions, typedefs, parameters here…
-// --------------------------------------------------------------------------
 
 endpackage : hea_func_pack

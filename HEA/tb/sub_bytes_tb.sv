@@ -2,47 +2,59 @@
 
 module sub_bytes_tb;
 
-  // 200 MHz clock generation (period = 5 ns)
-  logic clk = 0;
-  always #2.5 clk = ~clk;
+  // Clock & Reset
+  logic clk;
+  logic rst_n;
 
-  // DUT inputs
-  logic [7:0] b;
-  // DUT outputs
-  logic [7:0] sb;
-
-  // Instantiate Device Under Test (DUT)
+  // DUT I/O
+  logic [127:0] b;
+  logic start;
+  logic [127:0] b_sb;
+  logic [127:0] expected=128'h638293c31bfc33f5c4eeacea4bc12816;
+  
+  // Instantiate SubBytes module
   sub_bytes uut (
-    .b   (b),
-    .sb  (sb)
+    .clk    (clk),
+    .rst_n  (rst_n),
+    .b      (b),
+    .start  (start),
+    .b_sb   (b_sb)
   );
 
-  // Waveform dump for post-simulation analysis
+  // Clock generation: 100 MHz
+  initial clk = 0;
+  always #5 clk = ~clk;
+
   initial begin
-    $dumpfile("tb_sub_bytes.vcd");
+    // Dump waves
+    $dumpfile("sub_bytes_tb.vcd");
     $dumpvars(0, sub_bytes_tb);
-  end
 
-  // Test stimulus
-  initial begin
-    // Wait a few cycles for initialization
-    #10;
+    // Initialize
+    rst_n = 0;
+    start = 0;
+    b     = 128'h0;
+    #20;
+    rst_n = 1;
 
-    // Test vector 1
-    b = 8'h00; #10;
-    $display("b = 0x%0h, sb = 0x%0h", b, sb);
+    // Test vector: known plaintext
+    b = 128'h00112233445566778899aabbccddeeff;
 
-    // Test vector 2
-    b = 8'h53; #10;
-    $display("b = 0x%0h, sb = 0x%0h", b, sb);
+    // Pulse start
+    @(posedge clk);
+    start = 1;
+    @(posedge clk);
+    start = 0;
 
-    // Test vector 3
-    b = 8'hFF; #10;
-    $display("b = 0x%0h, sb = 0x%0h", b, sb);
+    // Wait for 17 cycles (16 bytes + done cycle)
+    repeat (20) @(posedge clk);
 
-    // Add more test vectors as needed
+    assert (b_sb == expected)
 
-    $display("Testbench complete.");
+    // Display results
+    $display("Input State : 0x%032h", b);
+    $display("SubBytes Out: 0x%032h", b_sb);
+
     $finish;
   end
 

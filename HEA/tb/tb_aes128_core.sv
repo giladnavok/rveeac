@@ -18,6 +18,10 @@ module tb_aes128_core;
   logic        ready_o;
   logic        done_o;
 
+  // TB Wires 
+  logic [8:0] cycle_counter;
+  logic start_counter;
+  logic [127:0] expected;
   // Instantiate AES core
   aes128_core uut (
     .clk             (clk),
@@ -36,6 +40,15 @@ module tb_aes128_core;
     $dumpvars(0, tb_aes128_core);
   end
 
+  always_ff @( posedge clk or negedge rst_n ) begin 
+    if (!rst_n) begin
+      cycle_counter <= 0;
+    end else begin
+      cycle_counter <= (start_counter) ? cycle_counter + 1 : cycle_counter;
+    end    
+  end
+  assign expected = 128'h69c4e0d8_6a7b0430_d8cdb780_70b4c55a;
+  
   initial begin
     // Initialize
     rst_n = 0;
@@ -43,6 +56,7 @@ module tb_aes128_core;
     key_i = 128'h0;
     plain_text_i = 128'h0;
 
+    start_counter <= 0;
     // Release reset
     #20;
     rst_n = 1;
@@ -54,13 +68,16 @@ module tb_aes128_core;
     key_i = 128'h00010203_04050607_08090a0b_0c0d0e0f;
     plain_text_i = 128'h00112233_44556677_8899aabb_ccddeeff;
     start_i = 1;
+    start_counter <= 1;
     @(posedge clk);
     start_i = 0;
 
     // Wait for completion
     wait (done_o == 1'b1);
-    
-    #10
+    start_counter <= 0;
+
+    @(posedge clk);
+    assert (cipher_text_o == expected) else $error("AES mismatch at time %0t: got %032h, expected %032h", $time, cipher_text_o, expected);
 
     // Display result
     $display("AES-128 Encryption Result:");

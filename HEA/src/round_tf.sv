@@ -1,22 +1,29 @@
 module round_tf #( 
     parameter bit EN_MC = 1 // enable mix columns
   )(
+    input  logic clk,
+    input  logic rst_n,
+    input  logic start,
     input  logic [127:0] b_i,
+    output logic [127:0] b_sb_o,
     output logic [127:0] b_sr_o,
-    output logic [127:0] b_o
+    output logic [127:0] b_o,
+    output logic done_o
   );
-    logic [127:0] b_sb; // b_sb = in s-box
   
-    genvar i;
-    generate
-      for (i = 0; i < 16; i++) begin
-        sub_bytes u_sbox(
-          .b(b_i[8*(15-i) +: 8]),
-          .b_sb(b_sb[8*(15-i) +: 8])
-        );
-      end
-    endgenerate
-
+    logic [127:0] b_sb; // b_sb = in s-box
+    
+    sub_bytes u_sbox(
+      .clk(clk),
+      .rst_n(rst_n),
+      .start(start),
+      .b(b_i),
+      .b_sb(b_sb),
+      .done(done_o)
+    );
+    
+    assign b_sb_o = b_sb;
+    
     logic [127:0] b_sr; // b_sr = b_sb shift rows
     shift_rows u_sr(
         .b(b_sb),

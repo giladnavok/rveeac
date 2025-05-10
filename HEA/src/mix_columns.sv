@@ -2,6 +2,13 @@
 
 import hea_func_pack::*;
 
+/*
+  Each column is calculated as such:
+    |d0|    |2 3 1 1] |b0|
+    |d1|    |1 2 3 1| |b1|
+    |d2|  = |1 1 2 3| |b2| 
+    |d3|    |3 1 1 2| |b3|
+*/
 module mix_columns (
   input  logic [127:0] b,
   output logic [127:0] b_mc
@@ -12,7 +19,7 @@ module mix_columns (
   // unpack bytes
   genvar i;
   for (i = 0; i < 16; i++) begin
-    assign s_in[i] = b[8*i +: 8];
+    assign s_in[i] = b[8*(15-i) +: 8];
   end
 
   // operate on each of the 4 columns
@@ -27,14 +34,14 @@ module mix_columns (
     assign a2 = s_in[4*c + 2];
     assign a3 = s_in[4*c + 3];
 
-    assign s_out[4*c + 0] = gfmul2(a0) ^ gfmul3(a1) ^ a2       ^ a3;
-    assign s_out[4*c + 1] = a0       ^ gfmul2(a1) ^ gfmul3(a2) ^ a3;
-    assign s_out[4*c + 2] = a0       ^ a1       ^ gfmul2(a2) ^ gfmul3(a3);
-    assign s_out[4*c + 3] = gfmul3(a0) ^ a1       ^ a2       ^ gfmul2(a3);
+    assign s_out[4*c + 0] = gfmul2(a0) ^ gfmul3(a1) ^ a2         ^ a3;
+    assign s_out[4*c + 1] = a0         ^ gfmul2(a1) ^ gfmul3(a2) ^ a3;
+    assign s_out[4*c + 2] = a0         ^ a1         ^ gfmul2(a2) ^ gfmul3(a3);
+    assign s_out[4*c + 3] = gfmul3(a0) ^ a1         ^ a2         ^ gfmul2(a3);
   end
 
   // pack back to 128-bit state
   for (i = 0; i < 16; i++) begin
-    assign b_mc[8*i +: 8] = s_out[i];
+    assign b_mc[8*(15-i) +: 8] = s_out[i];
   end
 endmodule
