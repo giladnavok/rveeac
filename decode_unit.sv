@@ -8,6 +8,8 @@ module decode_unit (
 	// --------- Input Controls  --------
 	input logic ready_i, 						///< Execution stage can accept controls and data
 	input logic valid_i, 						///< Input data from IF stage is valid
+	input logic exe_dmem_apb_ready_i, 				///<  !!!!
+	input logic misspredict_i, 				///<  !!!!
 	
 
 	// --------- Input Data  ------------
@@ -141,8 +143,8 @@ assign reg32_used_in_first_cycle =
 assign store_load_stall = 
 	( 
 		cs.dec.en.dmem_load_bypass && 
-		cs_exe_o.en.dmem_store && 
-		!ready_i_d
+		cs_exe_o.en.dmem_store &&
+		!ready_i
 	);
 
 assign full_read_after_write = 
@@ -179,7 +181,8 @@ always_ff @(posedge clk or negedge rst_n) begin
 	if (!rst_n || !valid_i) first_cycle <= 1'b1;
 	else if (stall) first_cycle <= first_cycle;
 	else if (ready_o) first_cycle <= 1'b1; 
-	else first_cycle <= 1'b0;
+	else if (ready_i) first_cycle <= 1'b0;
+	else first_cycle <= first_cycle;
 end
 
 // Sample delayed signals
@@ -212,17 +215,17 @@ assign rs2 = inst_i[24:20];
 // Output Interface //
 // ---------------- //
 
-assign valid_o = valid_i && valid_i_d;
+assign valid_o = (valid_i || valid_i_d) && !misspredict_i;
 assign ready_o = ( !first_cycle || !valid_i ) && !stall && !stall_d;
 assign jmp_o = first_cycle && cs.dec.en.jmp && valid_i;
 assign branch_o = first_cycle && !stall_d && cs.dec.en.branch && valid_i;
-assign dmem_load_bypass_o = cs.dec.en.dmem_load_bypass && valid_i && first_cycle && !stall;
+assign dmem_load_bypass_o = ready_i && cs.dec.en.dmem_load_bypass && valid_i && first_cycle && !stall;
 assign jmp_target_o = add_out;
 assign lsu_load_addr_bypass_o = add_out;
 
 // Assign rs32_o
 always_comb begin
-	if (cs.dec.en.reg32_use && !store_load_stall) begin
+	if (cs.dec.en.reg32_use && !stall) begin
 		if (cs.exe.en.dmem_store && !first_cycle) begin
 			rs32_o = rs2;
 		end else begin
@@ -243,7 +246,7 @@ always_ff @(posedge clk or negedge rst_n) begin
 		cs_exe_o <= '0;
 		exe_first_cycle_o <= 1'b0;
 	end else begin
-		if ((!stall && (ready_i || ready_i_d) && (valid_i || valid_i_d))) begin
+		if ((!stall && (ready_i || ready_i_d) && (valid_o))) begin
 			exe_first_cycle_o <= first_cycle;
 			if (first_cycle && cs.dec.en.lsu_addr) begin
 				lsu_store_addr_o <= add_out;

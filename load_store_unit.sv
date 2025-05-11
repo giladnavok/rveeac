@@ -25,7 +25,8 @@ module load_store_unit (
 	// Output Controls //
 	// --------------- //
 	output logic half_o,
-	output logic ready_o,
+	output logic apb_ready_o,
+	output logic done_o,
 	output logic valid_o,
 	output logic err_o,
 
@@ -35,18 +36,46 @@ module load_store_unit (
 );
 
 logic [31:0] write_data;
+logic [31:0] addr;
+logic apb_controller_transfer_dir;
 
 // Internal Registers //
 
-logic [31:0] reg1_d;
+logic [31:0] reg1_or_load_addr_d;
+logic transfer_dir;
+assign apb_controller_transfer_dir = start_i ? dir_i : transfer_dir;
 
 
+localparam READ = 1'b0;
 localparam WRITE = 1'b1;
-always_ff @(negedge (first_cycle && (dir_i == WRITE)) ) begin
-	reg1_d <= reg1_i;
+always_ff @(posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		reg1_or_load_addr_d <= '0;
+		transfer_dir <= READ;
+	end else if (start_i) begin 
+		transfer_dir <= dir_i;
+		if (dir_i == WRITE) begin
+			reg1_or_load_addr_d <= reg1_i;
+		end else begin
+			reg1_or_load_addr_d <= addr_i;
+		end
+	end
 end
 
-assign write_data = first_cycle ? reg1_i : reg1_d;
+always_comb begin
+	write_data = '0;
+	if (apb_controller_transfer_dir == WRITE) begin
+		write_data = first_cycle ? reg1_i : reg1_or_load_addr_d; 
+	end
+end
+
+always_comb begin
+	addr = addr_i;
+	if ((apb_controller_transfer_dir == READ) && !start_i) begin
+		addr = reg1_or_load_addr_d;
+	end
+end
+
 
 // Add mux to execution stage to mux wdata to 16 bit regfile read port for
 // SH/SB
@@ -72,6 +101,7 @@ logic valid;
 logic valid_d;
 assign valid_o = valid | valid_d;
 assign half_o = valid_d;
+assign done_o = valid_o ? half_o : apb_ready_o;
 
 assign ldata_o = valid_d ? ldata_uh_d : ldata_lh;
 
@@ -100,15 +130,15 @@ apb_controller_sbm dmem_apb_controller (
 	.rst_n(rst_n),
 
 	.start_i(start_i),
-	.dir_i(dir_i),
+	.dir_i(apb_controller_transfer_dir),
 	.write_size_i(size_i),
 
 	.apb(dmem_apb),
 
 	.wdata_i(write_data),
-	.addr_i(addr_i),
+	.addr_i(addr),
 
-	.ready_o(ready_o),
+	.ready_o(apb_ready_o),
 	.valid_o(valid),
 	.err_o(err_o),
 
