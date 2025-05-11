@@ -141,6 +141,9 @@ package typedefs;
 		logic cmp_flip;
 		logic wb_order_flip;
 		logic rs16_half_order_flip;
+		logic accel_start_enc;
+		logic accel_start_dec;
+		logic accel_load_key;
 	} cs_exe_en_s;
 
 	typedef struct packed {
@@ -168,7 +171,8 @@ package typedefs;
 		OPC_AUIPC = 7'b00_101_11,
 		OPC_LUI = 7'b01_101_11,
 		OPC_SYSTEM = 7'b11_100_11,
-		OPC_FENCE = 7'b00_011_11
+		OPC_FENCE = 7'b00_011_11,
+		OPC_ACCEL = 7'b01_110_11
 	} opcode_e;
 
 	typedef enum logic [2:0] {
@@ -206,6 +210,12 @@ package typedefs;
 		FNC3_OP_SRL_SRA = 3'b101
 	} funct3_operation_e;
 
+	typedef enum logic [2:0] {
+		FNC3_LD_KEY = 3'b000,
+		FNC3_ST_ENC = 3'b001,
+		FNC3_ST_DEC = 3'b010
+	} funct3_accel_e;
+
 //	typedef enum logic [2:0] {
 //		FNC3_JALR = 3'b000,
 //		FNC3_FENCE = 3'b000,
@@ -238,7 +248,10 @@ package typedefs;
 			cmp_req: DISABLE,
 			cmp_flip: DISABLE,
 			wb_order_flip: DISABLE,
-			rs16_half_order_flip: DISABLE
+			rs16_half_order_flip: DISABLE,
+			accel_start_enc: DISABLE,
+			accel_start_dec: DISABLE,
+			accel_load_key: DISABLE
 		};
 endpackage
 

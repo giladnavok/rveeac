@@ -160,6 +160,7 @@ always_comb begin
 			cs_o.dec.sel.inst_type = INST_TYPE_I;
 			cs_o.dec.sel.add_sel = DEC_ADD_SEL_REG;
 			// Enable //
+			//cs_o.dec.en.lsu_addr = ENABLE;
 			cs_o.dec.en.dmem_load_bypass = ENABLE;
 			cs_o.dec.en.reg32_use = ENABLE;
 
@@ -274,6 +275,21 @@ always_comb begin
 					cs_o.exe.en.wb_order_flip = ENABLE;
 					cs_o.dec.en.forward_just_one_half = ENABLE;
 				end
+			endcase
+		end
+		OPC_ACCEL: begin
+			// Decode Stage //
+			// ------------ //
+			// Sel //
+			// Enable //
+			// Execution Stage //
+			// --------------- //
+			// Sel //
+			// Enable //
+			case (funct3_accel_e'(funct3_i))
+				FNC3_LD_KEY: cs_o.exe.en.accel_load_key = ENABLE;
+				FNC3_ST_ENC: cs_o.exe.en.accel_start_enc = ENABLE;
+				FNC3_ST_DEC: cs_o.exe.en.accel_start_dec = ENABLE;
 			endcase
 		end
 	endcase

@@ -30,6 +30,7 @@ module exe_mem_wb_stage #(
 
 	// --------- Output Controls --------
 	output logic ready_o, 						///< Execution stage ready for new controls and data
+	output logic dmem_apb_ready_o, 						///< Execution stage ready for new controls and data
 
 	// --------- Output Data --------- 
 	output logic [31:0] reg32_o, 				///< Register file 32 bit read port data
@@ -48,7 +49,8 @@ module exe_mem_wb_stage #(
 
 // LSU 
 logic load_store_write;
-logic load_store_ready;
+logic load_store_apb_ready;
+logic load_store_done;
 logic load_store_valid;
 logic load_store_half;
 logic load_store_err;
@@ -67,6 +69,16 @@ logic rd_h_sel;
 logic rs16_h_sel;
 logic regfile_write_en;
 logic [15:0] regfile_write_data;
+
+// Accel
+logic accel_load_key;
+logic accel_start_enc;
+logic accel_start_dec;
+logic accel_rf_write_en;
+logic [127:0] accel_data_in;
+logic [127:0] accel_data_out;
+logic accel_ready;
+logic accel_done;
 
 // ===============================
 //			Internal Registers        
@@ -93,7 +105,8 @@ load_store_unit load_store (
 	.reg1_i(reg32_data),
 	.addr_i(lsu_addr),
 
-	.ready_o(load_store_ready),
+	.apb_ready_o(load_store_apb_ready),
+	.done_o(load_store_done),
 	.valid_o(load_store_valid),
 	.half_o(load_store_half),
 	.err_o(load_store_err),
@@ -126,17 +139,34 @@ regfile_sbm regfile (
 	.rs16_i(rs16_i),
 	.rd_i(rd_i),
 	.write_i(regfile_write_en),
+	.accel_write_en_i(accel_rf_write_en),
 	.write_data_i(regfile_write_data),
 	.rd_h_sel_i(rd_h_sel),
 	.rs16_h_sel_i(rs16_h_sel),
+	.accel_di(accel_data_out),
 
 	`ifdef DEBUG
 		.registers_od(registers_od),
 	`endif
 
 	.rs32_do(reg32_data),
-	.rs16_do(reg16_data)
+	.rs16_do(reg16_data),
+	.accel_do(accel_data_in)
 
+);
+
+accel_dummy_sbm accel (
+	.clk(clk),
+	.rst_n(rst_n),
+	.load_key_i(accel_load_key),
+	.start_enc_i(accel_start_enc),
+	.start_dec_i(accel_start_dec),
+
+	.data_i(accel_data_in),
+	.data_o(accel_data_out),
+	.ready_o(accel_ready),
+	.done_o(accel_done),
+	.rf_en_o(accel_rf_write_en)
 );
 
 // ===============================
@@ -158,10 +188,14 @@ always_comb begin
 	endcase
 end
 
-assign transfer_start = (valid_i && (first_cycle && cs_i.en.dmem_store)) | dmem_load_bypass_i;
+assign transfer_start = load_store_done && ((valid_i && (first_cycle && cs_i.en.dmem_store)) || dmem_load_bypass_i);
 assign rs16_h_sel = (!first_cycle && !shift_bigger_then_16_o) ^ cs_i.en.rs16_half_order_flip;
-assign lsu_addr = cs_i.en.dmem_store ? lsu_store_addr_i : load_addr_bypass_i;
-assign load_store_write = cs_i.en.dmem_store;
+assign lsu_addr = (cs_i.en.dmem_store && !dmem_load_bypass_i) ? lsu_store_addr_i : load_addr_bypass_i;
+assign load_store_write = cs_i.en.dmem_store && !dmem_load_bypass_i;
+
+assign accel_load_key = cs_i.en.accel_load_key && valid_i && first_cycle;
+assign accel_start_enc = cs_i.en.accel_start_enc && valid_i && first_cycle;
+assign accel_start_dec = cs_i.en.accel_start_dec && valid_i && first_cycle;
 
 always_comb begin
 	regfile_write_en = 1'b0;
@@ -177,8 +211,9 @@ always_comb begin
 	end
 end
 
-assign ready_o = load_store_ready && !first_cycle;
+assign ready_o = cmp_result_valid_o || (accel_ready && load_store_done && !first_cycle);
 assign reg32_o = reg32_data;
+assign dmem_apb_ready_o = load_store_apb_ready;
 
 endmodule
 

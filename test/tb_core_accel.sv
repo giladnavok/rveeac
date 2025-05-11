@@ -1,7 +1,5 @@
-import typedefs::*;
 
-module tb_core_test_prog (
-);
+module tb_core_accel;
 
 localparam IMEM_SIZE = 1024;
 localparam DMEM_SIZE = 4096;
@@ -29,8 +27,7 @@ apb_if dmem_apb();
 
 apb_slave # (
 	.SIZE(IMEM_SIZE),
-	.INIT_FILENAME("test_prog.rv"),
-	.POSSIBLE_WAITS(1'b1)
+	.INIT_FILENAME("test_accel.rv")
 )  imem_inst (
 	.clk(clk),
 	.rst_n(rst_n),
@@ -39,8 +36,7 @@ apb_slave # (
 );
 
 apb_slave_byte # (
-	.SIZE(DMEM_SIZE),
-	.POSSIBLE_WAITS(1'b1)
+	.SIZE(DMEM_SIZE)
 ) dmem_inst (
 	.clk(clk),
 	.rst_n(rst_n),
