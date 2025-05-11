@@ -123,25 +123,28 @@ int mul_emulated(int a, int b) {
 /* ---------------------------------------------------------- */
 int main(void)
 {
-    int pass = 1;                       /* starts “all‑tests‑pass” */
-	// Easy
-    if (abs_diff(12, 5) != 7) pass = 0;
-    if (logical_ops(13, 11) != ((13 & 11) | (13 ^ 11))) pass = 0;
-    if (compare(3, 5) != 3) pass = 0;
-    if (add_loop(10, 4) != (10 + 9 + 8 + 7)) pass = 0;
-    if (control_flow(2) != 333) pass = 0;
-    if (mul_emulated(-3, 7) != -21) pass = 0;
+    int pass = 0;                       /* starts “all‑tests‑pass” */
+    if (abs_diff(12, 5) == 7) pass += 1;
+    if (logical_ops(13, 11) == ((13 & 11) | (13 ^ 11))) pass +=1;
+    if (compare(3, 5) == 3) pass += 1;
+    if (add_loop(10, 4) == (10 + 9 + 8 + 7)) pass += 1;
+    if (control_flow(2) == 333) pass += 1;
+    if (mul_emulated(-3, 7) == -21) pass += 1;
     
-	// Harder
-    if (shift_torture(0x13579BDF) !=  767258933) pass = 0;
-    if (shift_torture(-0x02468ACE) != 535881908) pass = 0;
+    if (shift_torture(0x13579BDF) ==  767258933) pass += 1;
+    if (shift_torture(-0x02468ACE) == 535881908) pass += 1;
 
-    if (mul_shift_add(-12345, 6789) !=  -83810205) pass = 0;
-    if (factorial_rec(10)           !=    3628800) pass = 0;
+    if (mul_shift_add(-12345, 6789) ==  -83810205) pass += 1;
+    if (factorial_rec(10)           ==    3628800) pass += 1;
 
-    if (char_sign_ext_test()        !=        -50) pass = 0;
-    if (carry_stress()              !=   80870190) pass = 0;
+    if (char_sign_ext_test()        ==        -50) pass += 1;
+    if (carry_stress()              ==   80870190) pass += 1;
+    
 
-   while (1);
+    /* ----  result retention loop  ----
+       ‘pass’ is a plain local variable on the stack.
+       The pointer keeps the compiler from discarding it,
+       so you can inspect its memory word after loading.      */
+       while (1);
 }
 

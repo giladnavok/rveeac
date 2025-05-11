@@ -30,7 +30,7 @@ apb_if dmem_apb();
 apb_slave # (
 	.SIZE(IMEM_SIZE),
 	.INIT_FILENAME("test_prog.rv"),
-	.POSSIBLE_WAITS(1'b0)
+	.POSSIBLE_WAITS(1'b1)
 )  imem_inst (
 	.clk(clk),
 	.rst_n(rst_n),

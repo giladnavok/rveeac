@@ -168,6 +168,7 @@ initial begin
 	#8 inst = NOP;
 	#8 inst = NOP;
 	#8 inst = NOP;
+	#8 inst = NOP;
 
 	assert(mem[2] == 66408);
 	assert(mem[3] == 872);
@@ -200,6 +201,7 @@ initial begin
 	#8 inst = NOP;
 	#8 inst = NOP;
 	#8 inst = NOP;
+	#8 inst = NOP;
 	assert(registers[7] == 32'haaaaaaaa);
 
 	#8 inst = 32'h01802383; // lw x7, 24(x0) /* x7  = 0xaaaaaaaa */
@@ -222,8 +224,9 @@ initial begin
 
 	// Test AUIPC
 	#8 inst = 32'h004cf717; // auipc x14, 1231 /* x14  = current_pc +  5042176 */
-	#4 auipc_pc = pc;
-	#4 inst = NOP;
+	#8 auipc_pc = pc;
+	inst = NOP;
+	#8 inst = NOP;
 	#8 inst = NOP;
 	#8 inst = NOP;
 	assert(registers[14] == auipc_pc + 5042176);
@@ -234,9 +237,11 @@ initial begin
 	#8 inst = NOP;
 	#8 inst = NOP;
 	#8 inst = NOP;
+	#8 inst = NOP;
 	assert(registers[15] == 66408);
 	assert(registers[16] == 2*66408);
 	#8 inst = 32'h01080833; // add x16, x16, x16 /* x16  = 4*66408 */
+	#8 inst = NOP;
 	#8 inst = NOP;
 	#8 inst = NOP;
 	#8 inst = NOP;
@@ -244,9 +249,9 @@ initial begin
 
     /* Test JAL */
 	#8 inst = 32'h0640006f; // jal x0, 100
-	#4 jmp_pc = pc;
-	#4 inst = NOP; // 4/8 depends if instruction was buffer in fetch stage
-	#4 assert(pc == jmp_pc + 100); #4;
+	#8 jmp_pc = pc;
+	inst = NOP; // 4/8 depends if instruction was buffer in fetch stage
+	#12 assert(pc == jmp_pc + 100); #4;
 
 	#8 inst = 32'h00080067; // jalr x0, 0(x16)
 	#8 inst = NOP;

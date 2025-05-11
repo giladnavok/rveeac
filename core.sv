@@ -34,6 +34,7 @@ logic [15:0] dec_wb_data_out;
 logic [4:0] dec_rd_out;
 logic [4:0] dec_rs32_out;
 logic [4:0] dec_rs16_out;
+logic dec_inst31_out;
 
 logic exe_ready;
 logic exe_cmp_result_valid;
@@ -74,6 +75,7 @@ fetch_unit fetch (
 	.branch_i(dec_branch),
 	.ready_i(dec_ready),
 	.branch_cmp_result_valid_i(exe_cmp_result_valid),
+	.inst31_i(dec_inst31_out),
 
 	.imem_apb(imem_apb),
 
@@ -115,7 +117,8 @@ decode_unit decode (
 	.wb_o(dec_wb_data_out),
 	.rd_o(dec_rd_out),
 	.rs32_o(dec_rs32_out),
-	.rs16_o(dec_rs16_out)
+	.rs16_o(dec_rs16_out),
+	.inst31_o(dec_inst31_out)
 );
 
 exe_mem_wb_stage exe_mem_wb (

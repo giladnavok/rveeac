@@ -34,7 +34,8 @@ module decode_unit (
 	output logic [15:0] wb_o, 					///< WB data fro execution stage.
 	output logic [4:0] rd_o, 					///< Register file write port index.
 	output logic [4:0] rs32_o, 					///< Register file 32 bit read port index.
-	output logic [4:0] rs16_o 					///< Register file 16 bit read port index.
+	output logic [4:0] rs16_o, 					///< Register file 16 bit read port index.
+	output logic inst31_o 					///< Register file 16 bit read port index.
 );
 
 // ===============================
@@ -44,10 +45,11 @@ module decode_unit (
 logic first_cycle;
 logic reg32_used_in_first_cycle;
 
-logic stall;
+logic stall_one_cycle;
 logic store_load_stall;
 logic full_read_after_write;
 logic half_read_after_write;
+logic issue;
 
 // Decode 
 opcode_e opcode;
@@ -67,18 +69,19 @@ logic [31:0] serializer_in;
 logic [15:0] serializer_out;
 logic serializer_en, forward_lower_half;
 
-//logic is_immediate_op;
-
 
 // ===============================
 //			Internal Registers        
 // ===============================
 
+logic [31:0] inst;
+logic [31:0] pc;
 logic [4:0] rs32_d;
-logic [4:0] rs16_d;
-logic stall_d;
 logic ready_i_d;
 logic valid_i_d;
+logic stall_one_cycle_d;
+logic state_e_d;
+
 
 
 // ===============================
@@ -100,18 +103,121 @@ control_unit control (
 
 imm_gen_sbm imm_gen (
 	.inst_type_i(cs.dec.sel.inst_type),
-	.inst_i(inst_i),
+	.inst_i(inst),
 	.imm_o(imm)
 );
 
 // ===============================
-//			Internal Logic
+//			Seqential Logic
+// ===============================
+//
+
+// -------------------------------
+// 		Decode unit FSM
+// -------------------------------
+// * ST_ISSUE_FIRST:  Issue first batch of controls and data to exe if it is ready, otherwise stall.
+// * ST_ISSUE_SECOND: Issue the second batch, and sample next instruction if ready, 
+// 	 				  otherwise switch to ST_WAIT_FETCH to wait for IF.
+// * ST_WAIT_FETCH: Wait for IF stage to finish fetching.
+
+enum logic [1:0] {ST_ISSUE_FIRST, ST_ISSUE_SECOND, ST_WAIT_FETCH} state_e;
+
+localparam logic [31:0] NOP = 32'h00000013;
+always_ff @(posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		state_e <= ST_WAIT_FETCH;
+		inst <= NOP;
+		pc <= '0;
+	end else begin
+		case (state_e)
+			ST_ISSUE_FIRST: begin
+				if (ready_i) begin
+					state_e <= misspredict_i ? ST_WAIT_FETCH :
+						stall_one_cycle ? ST_ISSUE_FIRST : ST_ISSUE_SECOND;
+				end
+			end
+			ST_ISSUE_SECOND, ST_WAIT_FETCH: begin
+				if (misspredict_i) begin
+					state_e <= ST_WAIT_FETCH;
+				end else if (valid_i) begin
+					inst <= inst_i;
+					pc <= pc_i;
+					state_e <= ST_ISSUE_FIRST;
+				end else begin
+					state_e <= ST_WAIT_FETCH;
+				end
+					
+			end
+		endcase
+	end
+end
+
+// Sample delayed signals
+always_ff @(posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		state_e_d <= '0;
+		stall_one_cycle_d <= 1'b0;
+		ready_i_d <= 1'b0;
+		valid_i_d <= 1'b0;
+		rs32_d <= 5'b0;
+	end else begin
+		state_e_d <= state_e;
+		stall_one_cycle_d <= stall_one_cycle;
+		rs32_d <= rs32_o;
+	end
+end
+
+// Output Sequential //
+// ----------------- //
+
+always_ff @(posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		lsu_store_addr_o <= '0;
+		alu_b_o <= '0;
+		wb_o <= '0;
+		rd_o <= '0;
+		rs16_o <= '0;
+		cs_exe_o <= '0;
+		exe_first_cycle_o <= 1'b0;
+	end else begin
+		if (issue) begin
+			exe_first_cycle_o <= first_cycle;
+			if (first_cycle && cs.dec.en.lsu_addr) begin
+				lsu_store_addr_o <= add_out;
+			end
+			if (cs.dec.en.alu_b && !(cs.dec.en.forward_just_one_half && !first_cycle)) begin 
+				alu_b_o <= serializer_out;
+			end
+			if (cs.dec.en.wb) begin
+				wb_o <= serializer_out;
+			end
+			if (cs.dec.en.cs_exe) begin
+				cs_exe_o <= cs.exe;
+			end
+			if (cs.dec.en.reg16_use && first_cycle) begin
+				rs16_o <= rs1;
+			end
+			if (cs.exe.en.rf_write) begin
+				rd_o <= rd;
+			end
+		end else if (misspredict_i) begin
+			cs_exe_o <= CS_EXE_EN_DEFAULT;
+			exe_first_cycle_o <= 1'b0;
+		end else if (state_e == ST_WAIT_FETCH) begin
+			cs_exe_o <= ready_i ? CS_EXE_EN_DEFAULT : cs_exe_o;
+		end 
+	end
+end
+
+
+// ===============================
+//		Combinatorical Logic
 // ===============================
 
 // Adder Logic  //
 // ------------ //
 assign add_b = imm;
-assign add_a = (cs.dec.sel.add_sel == DEC_ADD_SEL_PC) ? pc_i : reg32_i;
+assign add_a = (cs.dec.sel.add_sel == DEC_ADD_SEL_PC) ? pc : reg32_i;
 assign add_out = add_a + add_b;
 
 
@@ -127,7 +233,7 @@ always_comb begin
 	case (cs.dec.sel.alu_wb_sel)
 		ALU_WB_SEL_IMM: serializer_in = imm;
 		ALU_WB_SEL_REG: serializer_in = reg32_i;
-		ALU_WB_SEL_PC: serializer_in = pc_i;
+		ALU_WB_SEL_PC: serializer_in = pc;
 		ALU_WB_SEL_ADDER: serializer_in = add_out;
 	endcase
 end
@@ -151,7 +257,7 @@ assign full_read_after_write =
 	((rd_o != 5'b0) && 
 		(
 			(rd_o == rs1) && 
-			first_cycle && 
+			ready_i && 
 			cs_exe_o.en.rf_write && 
 			reg32_used_in_first_cycle
 		)
@@ -161,115 +267,82 @@ assign half_read_after_write =
 	((rd_o != 5'b0) && 
 		(
 			(rd_o == rs2) && 
-			first_cycle && 
+			ready_i && 
 			cs.dec.en.alu_b && 
 			(cs_exe_o.en.wb_order_flip != (cs.dec.sel.ser_start == SER_START_UH))
 		)
 	);
 		
-assign stall = 
+assign stall_one_cycle = 
 	(store_load_stall ||
 	full_read_after_write ||
 	half_read_after_write)
-	&& !stall_d && valid_o;
-;
-
-//assign is_immediate_op = cs.dec.en.alu_b && (cs.dec.sel.alu_wb_sel == ALU_WB_SEL_IMM);
-
-// Generate first_cycle
-always_ff @(posedge clk or negedge rst_n) begin
-	if (!rst_n || !valid_i) first_cycle <= 1'b1;
-	else if (stall) first_cycle <= first_cycle;
-	else if (ready_o) first_cycle <= 1'b1; 
-	else if (ready_i) first_cycle <= 1'b0;
-	else first_cycle <= first_cycle;
-end
-
-// Sample delayed signals
-always_ff @(posedge clk or negedge rst_n) begin
-	if (!rst_n) begin
-		stall_d <= 1'b0;
-		ready_i_d <= 1'b0;
-		valid_i_d <= 1'b0;
-		rs16_d <= 5'b0;
-		rs32_d <= 5'b0;
-	end else begin
-		stall_d <= stall;
-		ready_i_d <= ready_i;
-		valid_i_d <= valid_i;
-		rs16_d <= rs16_o;
-		rs32_d <= rs32_o;
-	end
-end
+	&& !stall_one_cycle_d && valid_o;
 
 // Decode Logic //
 // ------------ //
-assign opcode = opcode_e'(inst_i[6:0]);
-assign funct3 = inst_i[14:12];
-assign funct7 = inst_i[31:25];
-assign rd = inst_i[11:7];
-assign rs1 = inst_i[19:15];
-assign rs2 = inst_i[24:20];
+assign opcode = opcode_e'(inst[6:0]);
+assign funct3 = inst[14:12];
+assign funct7 = inst[31:25];
+assign rd = inst[11:7];
+assign rs1 = inst[19:15];
+assign rs2 = inst[24:20];
 
 
-// Output Interface //
-// ---------------- //
-
-assign valid_o = (valid_i || valid_i_d) && !misspredict_i;
-assign ready_o = ( !first_cycle || !valid_i ) && !stall && !stall_d;
-assign jmp_o = first_cycle && cs.dec.en.jmp && valid_i;
-assign branch_o = first_cycle && !stall_d && cs.dec.en.branch && valid_i;
-assign dmem_load_bypass_o = ready_i && cs.dec.en.dmem_load_bypass && valid_i && first_cycle && !stall;
-assign jmp_target_o = add_out;
-assign lsu_load_addr_bypass_o = add_out;
-
-// Assign rs32_o
+// Output Combinatorical //
+// --------------------- //
+assign first_cycle = (state_e == ST_ISSUE_FIRST);
+assign issue = (((state_e == ST_ISSUE_FIRST) && ready_i && !stall_one_cycle) || (state_e ==  ST_ISSUE_SECOND)) && !misspredict_i;
 always_comb begin
-	if (cs.dec.en.reg32_use && !stall) begin
-		if (cs.exe.en.dmem_store && !first_cycle) begin
-			rs32_o = rs2;
-		end else begin
-			rs32_o = (cs.dec.en.lsu_addr || cs.dec.en.dmem_load_bypass || cs.dec.en.jmp) ? rs1 : rs2;
+	inst31_o = inst[31];
+	valid_o = 1'b0;
+	ready_o = 1'b0;
+	jmp_o = 1'b0;
+	branch_o = 1'b0;
+	jmp_target_o = '0;
+	lsu_load_addr_bypass_o = '0;
+	dmem_load_bypass_o = 1'b0;
+	rs32_o = rs32_d;
+	case (state_e)
+		ST_ISSUE_FIRST: begin
+			if (ready_i || !stall_one_cycle || misspredict_i) begin
+				jmp_o = cs.dec.en.jmp;
+				branch_o = cs.dec.en.branch;
+				jmp_target_o = (cs.dec.en.jmp || cs.dec.en.branch) ? add_out : '0;
+			end
+			if (ready_i) begin
+				if (!stall_one_cycle) begin
+					if (misspredict_i) begin
+						valid_o = 1'b0;
+					end else begin
+						valid_o = 1'b1;
+						dmem_load_bypass_o = cs.dec.en.dmem_load_bypass;
+						lsu_load_addr_bypass_o = cs.dec.en.dmem_load_bypass ? add_out : '0;
+						rs32_o = cs.dec.en.reg32_use ? ((cs.dec.en.lsu_addr || cs.dec.en.dmem_load_bypass || cs.dec.en.jmp) ? rs1 : rs2) : rs32_d;
+					end
+				end else begin
+					valid_o = 1'b1;
+				end
+			end else begin
+				rs32_o = cs_exe_o.en.dmem_store ? rs2 : rs32_o;
+				valid_o = 1'b1;
+			end
 		end
-	end else begin
-		rs32_o = rs32_d;
-	end
+		ST_ISSUE_SECOND: begin
+			if (misspredict_i) begin
+				valid_o = 1'b0;
+			end else begin
+				rs32_o = cs.exe.en.dmem_store ? rs2 : rs32_o;
+				valid_o = 1'b1;
+				ready_o = 1'b1;
+			end
+		end
+		ST_WAIT_FETCH: begin
+			ready_o = 1'b1;
+			valid_o = (state_e_d != ST_WAIT_FETCH);
+		end
+	endcase
 end
 
-always_ff @(posedge clk or negedge rst_n) begin
-	if (!rst_n) begin
-		lsu_store_addr_o <= '0;
-		alu_b_o <= '0;
-		wb_o <= '0;
-		rd_o <= '0;
-		rs16_o <= '0;
-		cs_exe_o <= '0;
-		exe_first_cycle_o <= 1'b0;
-	end else begin
-		if ((!stall && (ready_i || ready_i_d) && (valid_o))) begin
-			exe_first_cycle_o <= first_cycle;
-			if (first_cycle && cs.dec.en.lsu_addr) begin
-				lsu_store_addr_o <= add_out;
-			end
-			if (cs.dec.en.alu_b && !(cs.dec.en.forward_just_one_half && !first_cycle)) begin 
-				alu_b_o <= serializer_out;
-			end
-			if (cs.dec.en.wb) begin
-				wb_o <= serializer_out;
-			end
-			if (cs.dec.en.cs_exe) begin
-				cs_exe_o <= cs.exe;
-			end
-			if (cs.dec.en.reg16_use && first_cycle) begin
-				rs16_o <= rs1;
-			end
-			if (cs.exe.en.rf_write) begin
-				rd_o <= rd;
-			end
-		end else begin
-			exe_first_cycle_o <= 1'b0;
-		end
-	end
-end
 
 endmodule
