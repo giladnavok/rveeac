@@ -1,7 +1,8 @@
 `timescale 1ns / 1ps
 
 module sub_bytes #(
-    parameter WIDTH = 128
+    parameter WIDTH = 128,
+    parameter OP = 1
 )
 (
 
@@ -15,8 +16,13 @@ module sub_bytes #(
     );
 
 // Current working s-box using a simple 256x8 ROM, simpler to implement but more expensive
-    logic [7:0] aes_inv_table [0:255];
-    initial $readmemh("aes_inv.mem", aes_inv_table);
+    logic [7:0] sbox_table [0:255];
+    if (OP) begin
+        initial $readmemh("sbox_table.mem", sbox_table);
+    end else begin
+        initial $readmemh("inv_sbox_table.mem", sbox_table);
+    end
+    
 
     typedef enum logic [2:0] { IDLE_S, RUN_S, DONE_S} s_box_t;
     s_box_t s_box_s;
@@ -45,7 +51,7 @@ module sub_bytes #(
                 end 
 
                 RUN_S: begin
-                    temp_res[byte_idx*8 +: 8] <= aes_inv_table[b[byte_idx*8 +: 8]];
+                    temp_res[byte_idx*8 +: 8] <= sbox_table[b[byte_idx*8 +: 8]];
                     byte_idx <= byte_idx + 1;
                     s_box_s  <= (byte_idx == num_of_bytes-1) ? DONE_S : RUN_S;
                 end

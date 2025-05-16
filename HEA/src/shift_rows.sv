@@ -1,5 +1,7 @@
 `timescale 1ns / 1ps
-module shift_rows (
+module shift_rows #( 
+    parameter bit OP = 1 // 1 - Encrypt , 0 - Decrypt
+  )(
     input  logic [127:0] b,
     output logic [127:0] b_sr
   );
@@ -13,9 +15,16 @@ module shift_rows (
     end
     
     // apply shifts: row r bytes are at positions 4*r + c
-    assign b_sr = {  s[0],s[5],s[10],s[15],
-                     s[4],s[9],s[14],s[3],
-                     s[8],s[13],s[2],s[7],
-                     s[12],s[1],s[6],s[11]};
+    if (OP) begin // Encrypt
+      assign b_sr = { s[0] ,s[5] ,s[10],s[15],
+                      s[4] ,s[9] ,s[14],s[3],
+                      s[8] ,s[13],s[2] ,s[7],
+                      s[12],s[1] ,s[6] ,s[11]};
+    end else begin // Decrypt
+      assign b_sr = { s[0] ,s[13],s[10],s[7],
+                      s[4] ,s[1] ,s[14],s[11],
+                      s[8] ,s[5] ,s[2] ,s[15],
+                      s[12],s[9] ,s[6] ,s[3]};
+    end
  
   endmodule

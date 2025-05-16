@@ -3,13 +3,23 @@
 import hea_func_pack::*;
 
 /*
-  Each column is calculated as such:
+  Encryption:
     |d0|    |2 3 1 1] |b0|
     |d1|    |1 2 3 1| |b1|
     |d2|  = |1 1 2 3| |b2| 
     |d3|    |3 1 1 2| |b3|
 */
-module mix_columns (
+
+/*
+  Decryption:
+    |d0|    |14 11 13 9| |b0|
+    |d1|    |9 14 11 13| |b1|
+    |d2|  = |13 9 14 11| |b2| 
+    |d3|    |11 13 9 14| |b3|
+*/
+module mix_columns #( 
+    parameter bit OP = 1 // 1 - Encrypt , 0 - Decrypt
+)(
   input  logic [127:0] b,
   output logic [127:0] b_mc
 );
@@ -34,10 +44,22 @@ module mix_columns (
     assign a2 = s_in[4*c + 2];
     assign a3 = s_in[4*c + 3];
 
-    assign s_out[4*c + 0] = gfmul2(a0) ^ gfmul3(a1) ^ a2         ^ a3;
-    assign s_out[4*c + 1] = a0         ^ gfmul2(a1) ^ gfmul3(a2) ^ a3;
-    assign s_out[4*c + 2] = a0         ^ a1         ^ gfmul2(a2) ^ gfmul3(a3);
-    assign s_out[4*c + 3] = gfmul3(a0) ^ a1         ^ a2         ^ gfmul2(a3);
+    if (OP) begin // Encrypt
+
+      assign s_out[4*c + 0] = gfmul2(a0) ^ gfmul3(a1) ^ a2         ^ a3;
+      assign s_out[4*c + 1] = a0         ^ gfmul2(a1) ^ gfmul3(a2) ^ a3;
+      assign s_out[4*c + 2] = a0         ^ a1         ^ gfmul2(a2) ^ gfmul3(a3);
+      assign s_out[4*c + 3] = gfmul3(a0) ^ a1         ^ a2         ^ gfmul2(a3);
+
+    end else begin // Decrypt
+
+      assign s_out[4*c + 0] = gfmul14(a0) ^ gfmul11(a1)  ^ gfmul13(a2)  ^ gfmul9(a3);
+      assign s_out[4*c + 1] = gfmul9(a0)  ^ gfmul14(a1)  ^ gfmul11(a2)  ^ gfmul13(a3);
+      assign s_out[4*c + 2] = gfmul13(a0) ^ gfmul9(a1)   ^ gfmul14(a2)  ^ gfmul11(a3);
+      assign s_out[4*c + 3] = gfmul11(a0) ^ gfmul13(a1)  ^ gfmul9(a2)   ^ gfmul14(a3);
+
+    end
+
   end
 
   // pack back to 128-bit state
