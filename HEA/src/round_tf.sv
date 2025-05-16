@@ -13,7 +13,10 @@ module round_tf #(
   
     logic [127:0] b_sb; // b_sb = in s-box
     
-    sub_bytes u_sbox(
+    sub_bytes #(
+      .WIDTH(128)
+    )  
+    u_sbox(
       .clk(clk),
       .rst_n(rst_n),
       .start(start),

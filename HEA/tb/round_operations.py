@@ -89,7 +89,7 @@ def state_to_bytes(state: list[list[int]]) -> bytes:
 
 if __name__ == "__main__":
     # Example usage
-    plaintext = bytes.fromhex("00112233445566778899aabbccddeeff")
+    plaintext = bytes.fromhex("386d4186fde0dd6b50959579bd37a38b")
     state = bytes_to_state(plaintext)
     print("Before:")
     print([[hex(b) for b in row] for row in state])

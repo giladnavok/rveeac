@@ -59,7 +59,7 @@ module tb_round_tf;
     
     // Wait for completion
     wait (done == 1'b1);    
-    repeat (5) @(posedge clk);
+//    repeat (5) @(posedge clk);
 
     assert (b_sb == expected_sb) else $error("Failed S-Box");
     assert (b_sr == expected_sr) else $error("Failed Shift Rows");

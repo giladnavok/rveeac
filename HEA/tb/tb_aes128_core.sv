@@ -36,8 +36,9 @@ module tb_aes128_core;
 
   // Waveform dump
   initial begin
-    $dumpfile("tb_aes128_core.vcd");
-    $dumpvars(0, tb_aes128_core);
+//    $dumpfile("tb_aes128_core.vcd");
+//    $dumpvars(0, tb_aes128_core);
+    $dumpvars(0, uut);
   end
 
   always_ff @( posedge clk or negedge rst_n ) begin 
@@ -47,7 +48,7 @@ module tb_aes128_core;
       cycle_counter <= (start_counter) ? cycle_counter + 1 : cycle_counter;
     end    
   end
-  assign expected = 128'h69c4e0d8_6a7b0430_d8cdb780_70b4c55a;
+  assign expected = 128'h8df4e9aac5c7573a27d8d055d6e4d64b;
   
   initial begin
     // Initialize
@@ -65,8 +66,8 @@ module tb_aes128_core;
     @(posedge clk);
 
     // Apply single test vector
-    key_i = 128'h00010203_04050607_08090a0b_0c0d0e0f;
-    plain_text_i = 128'h00112233_44556677_8899aabb_ccddeeff;
+    key_i = 128'h2b7e151628aed2a6abf7158809cf4f3c;
+    plain_text_i = 128'h00112233445566778899aabbccddeeff;
     start_i = 1;
     start_counter <= 1;
     @(posedge clk);
@@ -77,6 +78,7 @@ module tb_aes128_core;
     start_counter <= 0;
 
     @(posedge clk);
+
     assert (cipher_text_o == expected) else $error("AES mismatch at time %0t: got %032h, expected %032h", $time, cipher_text_o, expected);
 
     // Display result

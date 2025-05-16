@@ -21,7 +21,7 @@ def aes128_encrypt_block(plaintext_block: bytes, key: bytes) -> bytes:
 
 def main():
     # 128-bit (16-byte) constant key
-    key = bytes.fromhex('000102030405060708090a0b0c0d0e0f')
+    key = bytes.fromhex('2b7e151628aed2a6abf7158809cf4f3c')
     # 128-bit plaintext block
     plaintext = bytes.fromhex('00112233445566778899aabbccddeeff')
 

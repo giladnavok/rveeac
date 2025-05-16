@@ -23,15 +23,13 @@ module aes128_core(
     // Internal Wires //
 	// -------------- //
 
-    typedef enum logic [2:0] { IDLE, INIT, ROUND, FIN, DONE } aes_state_t;
+    typedef enum logic [2:0] { IDLE, INIT, ROUND, FIN } aes_state_t;
     aes_state_t aes_state;
     logic [3:0] round_counter;
-    logic [3:0] sub_round_counter;
-    // logic [127:0] round_key [10:0];
     logic [127:0] round_key, nxt_round_key;
     logic start_round_key, start_round_enc;
     logic done_key_gen, done_enc_round;
-    logic [127:0] encryption_reg, nxt_encryption_reg, reg_sr;
+    logic [127:0] encryption_reg, nxt_encryption_reg, nxt_encryption_reg_sr;
 
     // Components //
 	// ---------- //
@@ -48,16 +46,29 @@ module aes128_core(
     round_tf u_nxt_enc_gen(
         .clk   (clk),
         .rst_n (rst_n),
-        .start (tart_round_enc),
+        .start (start_round_enc),
         .b_i   (encryption_reg),
-        .b_sr_o(reg_sr),
+        .b_sr_o(nxt_encryption_reg_sr),
         .b_o   (nxt_encryption_reg),
         .done_o(done_enc_round)
     );
   
     // FSM Logic //
 	// --------- //
-
+    /*  AES-128 block encryption summary:
+        1. Key schedule: expand 16-byte key into 11 round keys (one for pre-round + 10 rounds)
+        2. Initial AddRoundKey: state ⊕= RoundKey[0]
+        3. Rounds 1–9:
+            • SubBytes   – byte-wise S-box substitution
+            • ShiftRows  – rotate rows of the 4×4 state
+            • MixColumns – mix each column via Galois-field math
+            • AddRoundKey– state ⊕= RoundKey[r]
+        4. Final Round (10):
+            • SubBytes
+            • ShiftRows
+            • AddRoundKey (no MixColumns)
+        5. Output the resulting 16-byte state as ciphertext
+    */
     always_ff @( posedge clk or negedge rst_n ) begin : fsm_control
         if (!rst_n) begin
             done_o             <= 1'b0;
@@ -66,7 +77,6 @@ module aes128_core(
             encryption_reg     <= 128'b0;
             round_key          <= 128'b0;
             round_counter      <= 4'b0;
-            sub_round_counter  <= 4'b0;
             start_round_enc    <= 1'b0;
             start_round_key    <= 1'b0;
             aes_state          <= IDLE;
@@ -82,49 +92,43 @@ module aes128_core(
                     round_key       <= key_i;
                     encryption_reg  <= plain_text_i;
                     round_counter   <= 0;
-                    start_round_key <= 1'b1;
+                    // start_round_key <= 1'b1;
                     ready_o         <= 1'b0;
                     aes_state       <= INIT;
                 end
             end
             
-            INIT: begin
-                if (done_key_gen) begin
+            INIT: begin // Round 0 
+                // if (done_key_gen) begin
                     encryption_reg  <= encryption_reg ^ round_key; // First round Operation includes just a xor Op.
-                    round_counter   <= round_counter + 1;
-                    round_key       <= nxt_round_key;
+                    // round_counter   <= round_counter + 1;
+                    // round_key       <= nxt_round_key;
                     start_round_key <= 1'b1;
                     start_round_enc <= 1'b1;
                     aes_state       <= ROUND;
-                end
+                // end
             end
 
-            ROUND: begin
-                if(done_key_gen && done_key_gen) begin // round_tf takes 16 cycles 
-                    encryption_reg    <= nxt_encryption_reg ^ round_key; 
+            ROUND: begin // Round 1-9
+                if(done_enc_round) begin // round_tf takes 16 cycles 
+                    encryption_reg    <= nxt_encryption_reg ^ nxt_round_key; 
                     round_key         <= nxt_round_key;
                     round_counter     <= round_counter + 1;
                     start_round_key   <= 1'b1;
                     start_round_enc   <= 1'b1;
                 end
 
-                aes_state <= (round_counter == 9) ? FIN : ROUND;
-
+                aes_state <= (round_counter == 9) ? FIN : ROUND; 
             end
 
-            FIN: begin
-                if(done_key_gen && done_key_gen) begin
-                    encryption_reg <= reg_sr ^ round_key; // Final round doesn't use Mix Columns
-                    aes_state      <= DONE;
+            FIN: begin // Round 10
+                if(done_enc_round) begin
+                    cipher_text_o <= nxt_encryption_reg_sr ^ nxt_round_key; // Final round doesn't use Mix Columns
+                    aes_state      <= IDLE;
+                    done_o        <= 1'b1;
+                    ready_o       <= 1'b1;
+                    round_counter <= 0;
                 end
-            end
-
-            DONE: begin
-                done_o        <= 1'b1;
-                ready_o       <= 1'b1;
-                cipher_text_o <= encryption_reg;
-                round_counter <= 0;
-                aes_state     <= IDLE;
             end
 
             default: aes_state <= IDLE;
