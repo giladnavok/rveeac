@@ -8,16 +8,12 @@ Simulate AES-128 encryption of a single 16-byte block using a constant key.
 from Crypto.Cipher import AES
 
 def aes128_encrypt_block(plaintext_block: bytes, key: bytes) -> bytes:
-    """
-    Encrypts a single 16-byte block with AES-128 in ECB mode.
-    """
-    if len(plaintext_block) != 16:
-        raise ValueError("Plaintext must be exactly 16 bytes")
-    if len(key) != 16:
-        raise ValueError("Key must be exactly 16 bytes")
-
     cipher = AES.new(key, AES.MODE_ECB)
     return cipher.encrypt(plaintext_block)
+
+def aes128_decrypt_block(cipher_text_block: bytes, key: bytes) -> bytes:
+    plain = AES.new(key, AES.MODE_ECB)
+    return plain.decrypt(cipher_text_block)
 
 def main():
     # 128-bit (16-byte) constant key
@@ -26,10 +22,12 @@ def main():
     plaintext = bytes.fromhex('00112233445566778899aabbccddeeff')
 
     ciphertext = aes128_encrypt_block(plaintext, key)
-
-    print("Key        :", key.hex())
-    print("Plaintext  :", plaintext.hex())
-    print("Ciphertext :", ciphertext.hex())
-
+    plaintext_recon = aes128_decrypt_block(ciphertext, key)
+    
+    print("Key              :", key.hex())
+    print("Plain text       :", plaintext.hex())
+    print("Cipher text      :", ciphertext.hex())
+    print("plain_recon text :", plaintext_recon.hex())
+    
 if __name__ == "__main__":
     main()
