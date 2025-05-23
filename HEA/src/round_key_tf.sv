@@ -3,7 +3,7 @@ module round_key_tf #(
   )(
     input  logic clk,
     input  logic rst_n,
-    input  logic start,
+    input  logic start_i,
     input  logic [127:0] key_i,
     input  logic [3:0]   round_count_i,
     output logic [127:0] key_o,
@@ -31,14 +31,15 @@ module round_key_tf #(
     assign rot_w = {w[3][23:0],w[3][31:24]};
 
     sub_bytes #(
-      .WIDTH(32)
+      .WIDTH(32),
+      .OP(1'b1)
     ) u_sbox (
       .clk(clk),
       .rst_n(rst_n),
-      .start(start),
-      .b(rot_w),
-      .b_sb(sb_w),
-      .done(done_o)
+      .start_i(start_i),
+      .s_i(rot_w),
+      .s_o(sb_w),
+      .done_o(done_o)
     );
 
     // Check Timing here, may need to split into stages

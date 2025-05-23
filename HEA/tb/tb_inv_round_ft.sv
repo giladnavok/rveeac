@@ -9,10 +9,10 @@ module tb_inv_round_tf;
   logic done;
   
   // Test inputs
-  logic [127:0] b_i;
+  logic [127:0] s_i;
 
-  logic [127:0] b_sr;
-  logic [127:0] b_o;
+  logic [127:0] s_sr;
+  logic [127:0] s_o;
   
   // Clock generation: 100 MHz
   initial clk = 0;
@@ -20,14 +20,13 @@ module tb_inv_round_tf;
 
   // Instantiate with MixColumns enabled
   inv_round_tf uut_en (
-    .clk       (clk),
-    .rst_n     (rst_n),
-    .start     (start),
-    .b_i       (b_i),
-    .bypass_mc (1'b1),
-    .b_sr_o    (b_sr),
-    .b_o       (b_o),
-    .done_o    (done)
+    .clk        (clk),
+    .rst_n      (rst_n),
+    .start_i    (start),
+    .s_i        (s_i),
+    .bypass_mc_i(1'b0),
+    .s_o        (s_o),
+    .done_o     (done)
   );
 
   initial begin
@@ -38,12 +37,12 @@ module tb_inv_round_tf;
     // Initialize
     rst_n = 0;
     start = 0;
-    b_i   = 128'h0;
+    s_i   = 128'h0;
     #20;
     rst_n = 1;
 
     // Test vector 1
-    b_i = 128'h00112233445566778899aabbccddeeff;
+    s_i = 128'h00112233445566778899aabbccddeeff;
     
     // Pulse start
     @(posedge clk);

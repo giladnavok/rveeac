@@ -23,11 +23,10 @@ module aes128_decrypt(
     // Internal Wires //
 	// -------------- //
 
-    typedef enum logic [2:0] { IDLE, GEN_ROUND_KEYS, INV_FIN_ROUND ,INV_ROUND} aes_state_t;
-    aes_state_t aes_state;
+    typedef enum logic [2:0] { IDLE_S, GEN_ROUND_KEYS_S, INV_FIN_ROUND_S, INV_ROUND_S} aes_state_t;
+    aes_state_t aes_s;
 
     logic [127:0] round_keys_table [0:10];
-
 
     logic [3:0] round_counter;
     logic [127:0] round_key, nxt_round_key;
@@ -41,7 +40,7 @@ module aes128_decrypt(
     round_key_tf u_nxt_key_gen(
         .clk          (clk),
         .rst_n        (rst_n),
-        .start        (start_round_key),
+        .start_i      (start_round_key),
         .key_i        (round_key),
         .round_count_i(round_counter),
         .key_o        (nxt_round_key),
@@ -49,13 +48,13 @@ module aes128_decrypt(
     );
 
     inv_round_tf u_nxt_dec_gen( 
-         .clk      (clk),
-         .rst_n    (rst_n),
-         .start    (start_round_dec),
-         .bypass_mc(bypass_mc),
-         .b_i      (decryption_reg),
-         .b_o      (nxt_decryption_reg),
-         .done_o   (done_dec_round)
+         .clk        (clk),
+         .rst_n      (rst_n),
+         .start_i    (start_round_dec),
+         .bypass_mc_i(bypass_mc),
+         .s_i        (decryption_reg),
+         .s_o        (nxt_decryption_reg),
+         .done_o     (done_dec_round)
     );
   
     // FSM Logic //
@@ -95,15 +94,15 @@ module aes128_decrypt(
             start_round_dec   <= 1'b0;
             start_round_key   <= 1'b0;
             round_keys_table  <= '{ default: 128'h0 };
-            aes_state         <= IDLE;
+            aes_s             <= IDLE_S;
         end else begin
 
             start_round_key <= 1'b0; 
             start_round_dec <= 1'b0;
             bypass_mc       <= 1'b0;
 
-            case (aes_state)
-            IDLE: begin
+            case (aes_s)
+            IDLE_S: begin
                 done_o <= 1'b0;
                 if (start_i) begin
                     round_key           <= key_i;
@@ -112,11 +111,11 @@ module aes128_decrypt(
                     round_counter       <= 0;
                     start_round_key     <= 1'b1;
                     ready_o             <= 1'b0;
-                    aes_state           <= GEN_ROUND_KEYS;
+                    aes_s               <= GEN_ROUND_KEYS_S;
                 end
             end
             
-            GEN_ROUND_KEYS: begin // Generate round keys table 
+            GEN_ROUND_KEYS_S: begin // Generate round keys table 
                 if (done_key_gen && round_counter < 10) begin
                     round_keys_table[round_counter+1] <= nxt_round_key;
                     round_counter                     <= round_counter + 1;
@@ -131,11 +130,11 @@ module aes128_decrypt(
                     decryption_reg  <= decryption_reg ^ round_keys_table[round_counter];
                     start_round_dec <= 1'b1;
                     bypass_mc       <= 1'b1;
-                    aes_state       <= INV_FIN_ROUND;
+                    aes_s           <= INV_FIN_ROUND_S;
                 end
             end
 
-            INV_FIN_ROUND: begin // Round 10 
+            INV_FIN_ROUND_S: begin // Round 10 
                 bypass_mc       <= 1'b1;
                 if(done_dec_round) begin // round_tf takes 16 cycles 
                     decryption_reg    <= nxt_decryption_reg ^ round_keys_table[round_counter]; // Bypassing the inv_mix_columns
@@ -143,11 +142,11 @@ module aes128_decrypt(
                     round_counter     <= round_counter - 1;
                     start_round_dec   <= 1'b1;
                     bypass_mc         <= 1'b0;
-                    aes_state         <= INV_ROUND;
+                    aes_s             <= INV_ROUND_S;
                 end
             end
 
-            INV_ROUND: begin // Round 9 - 0
+            INV_ROUND_S: begin // Round 9 - 0
 
                 if(done_dec_round) begin
                     if (round_counter != 0) begin
@@ -158,13 +157,13 @@ module aes128_decrypt(
                         plain_text_o <= nxt_decryption_reg ^ round_keys_table[round_counter]; 
                         done_o       <= 1'b1;
                         ready_o      <= 1'b1; 
-                        aes_state    <= IDLE;
+                        aes_s        <= IDLE_S;
                     end
                 end
 
             end
 
-            default: aes_state <= IDLE;
+            default: aes_s <= IDLE_S;
             
         endcase
         end

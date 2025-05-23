@@ -13,12 +13,14 @@ module tb_round_key_tf;
   // DUT outputs
   logic [127:0] key_o;
   logic        done_o;
+  
+  logic [127:0] round_keys_table [0:10];
 
   // Instantiate Device Under Test
   round_key_tf dut (
     .clk(clk),
     .rst_n(rst_n),
-    .start(start),
+    .start_i(start),
     .key_i(key_i),
     .round_count_i(round_count_i),
     .key_o(key_o),
@@ -36,23 +38,26 @@ module tb_round_key_tf;
     rst_n           = 0;
     start           = 0;
     key_i           = 128'h2b7e151628aed2a6abf7158809cf4f3c; // Example master key
-    round_count_i   = 4'd1;
-
+    
+    round_count_i   = 4'd0;
+    round_keys_table = '{ default: 128'h0 };
     // Apply reset
     #20;
     rst_n = 1;
     #20;
-
+    
+    round_keys_table[0] = key_i;
     // First round key generation
     start = 1;
     #10;
     start = 0;
     #10;
     wait (done_o == 1'b1);
+    round_keys_table[round_count_i+1] = key_o;
     $display("Round %0d key: %h", round_count_i, key_o);
 
     // Generate rounds 2 through 10 by chaining
-    for (int i = 2; i <= 10; i++) begin
+    for (int i = 1; i <= 9; i++) begin
       key_i         = key_o;
       round_count_i = i;
       #10;
@@ -62,6 +67,7 @@ module tb_round_key_tf;
       #10;
 
       wait (done_o == 1'b1);
+      round_keys_table[round_count_i+1] = key_o;
       $display("Round %0d key: %h", round_count_i, key_o);
     end
 

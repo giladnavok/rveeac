@@ -76,7 +76,7 @@ module tb_aes128_encrypt;
     wait (done_o == 1'b1);
     start_counter <= 0;
 
-    @(posedge clk);
+    repeat (3) @(posedge clk);
 
     assert (cipher_text_o == expected) else $error("AES mismatch at time %0t: got %032h, expected %032h", $time, cipher_text_o, expected);
 

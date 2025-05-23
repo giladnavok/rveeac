@@ -1,49 +1,41 @@
-module round_tf #( 
-    parameter bit EN_MC = 1 // enable mix columns
-  )(
+module round_tf (
     input  logic clk,
     input  logic rst_n,
-    input  logic start,
-    input  logic [127:0] b_i,
-    output logic [127:0] b_sb_o,
-    output logic [127:0] b_sr_o,
-    output logic [127:0] b_o,
+    input  logic start_i,
+    input  logic [127:0] s_i,
+    output logic [127:0] s_sr_o,
+    output logic [127:0] s_o,
     output logic done_o
   );
   
-    logic [127:0] b_sb; // b_sb = in s-box
+    logic [127:0] s_sb; // s_sb = in s-box
     
     sub_bytes #(
-      .WIDTH(128)
+      .WIDTH(128),
+      .OP(1'b1)
     )  
     u_sbox(
       .clk(clk),
       .rst_n(rst_n),
-      .start(start),
-      .b(b_i),
-      .b_sb(b_sb),
-      .done(done_o)
+      .start_i(start_i),
+      .s_i(s_i),
+      .s_o(s_sb),
+      .done_o(done_o)
     );
     
-    assign b_sb_o = b_sb;
-    
-    logic [127:0] b_sr; // b_sr = b_sb shift rows
-    shift_rows u_sr(
-        .b(b_sb),
-        .b_sr(b_sr)
-    );
+    // In case of timing problems add a pipe after the sub bytes
+    logic [127:0] s_sr; 
 
-    assign b_sr_o = b_sr;
+    shift_rows #(.OP(1'b1)) u_sr(
+        .s_i(s_sb),
+        .s_o(s_sr)
+    );
     
-    generate
-      if (EN_MC) begin
-        mix_columns u_mc (
-          .b    (b_sr),
-          .b_mc (b_o)
-        );
-      end else begin : MC_BYPASS
-        assign b_o = b_sr;
-      end
-    endgenerate
+    assign s_sr_o = s_sr;
+    
+    mix_columns #(.OP(1'b1)) u_mc (
+      .s_i (s_sr),
+      .s_o (s_o)
+    );
 
   endmodule

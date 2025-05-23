@@ -72,7 +72,9 @@ module tb_aes128_core;
         assert (text_o == 128'h3243f6a8885a308d313198a2e0370734) else begin
             $error("Decryption failed: expected 3243f6a8885a308d313198a2e0370734, got %h", text_o);
         end
-
+        
+        repeat (2) @(posedge clk)
+        
         $display("AES core encrypt-decrypt test PASSED");
         $finish;
     end

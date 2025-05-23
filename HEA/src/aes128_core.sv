@@ -19,7 +19,7 @@ module aes128_core (
 
     // State encoding
     typedef enum logic [2:0] { IDLE, ENCRYPT, DECRYPT } aes_state_t;
-    aes_state_t aes_state;
+    aes_state_t aes_s;
 
     // Internal wires
     logic [127:0] enc_text_o, dec_text_o;
@@ -55,35 +55,35 @@ module aes128_core (
             text_o    <= 128'b0;
             done_o    <= 1'b0;
             ready_o   <= 1'b0;
-            aes_state <= IDLE;
+            aes_s     <= IDLE;
         end else begin
             // drive ready/done
             ready_o <= enc_ready && dec_ready;  // only valid when neither unit is running
             done_o  <= enc_done  || dec_done;
 
-            case (aes_state)
+            case (aes_s)
                 IDLE: begin
                     if (start_enc_i)
-                        aes_state <= ENCRYPT;
+                        aes_s <= ENCRYPT;
                     else if (start_dec_i)
-                        aes_state <= DECRYPT;
+                        aes_s <= DECRYPT;
                 end
 
                 ENCRYPT: begin
                     if (enc_done) begin
                         text_o    <= enc_text_o;
-                        aes_state <= IDLE;
+                        aes_s     <= IDLE;
                     end
                 end
 
                 DECRYPT: begin
                     if (dec_done) begin
                         text_o    <= dec_text_o;
-                        aes_state <= IDLE;
+                        aes_s     <= IDLE;
                     end
                 end
 
-                default: aes_state <= IDLE;
+                default: aes_s <= IDLE;
             endcase
         end
     end

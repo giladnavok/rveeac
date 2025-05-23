@@ -23,8 +23,9 @@ module aes128_encrypt(
     // Internal Wires //
 	// -------------- //
 
-    typedef enum logic [2:0] { IDLE, INIT, ROUND, FIN } aes_state_t;
-    aes_state_t aes_state;
+    typedef enum logic [2:0] { IDLE_S, INIT_S, ROUND_S, FIN_S } aes_state_t;
+    aes_state_t aes_s;
+    
     logic [3:0] round_counter;
     logic [127:0] round_key, nxt_round_key;
     logic start_round_key, start_round_enc;
@@ -36,7 +37,7 @@ module aes128_encrypt(
     round_key_tf u_nxt_key_gen(
         .clk          (clk),
         .rst_n        (rst_n),
-        .start        (start_round_key),
+        .start_i      (start_round_key),
         .key_i        (round_key),
         .round_count_i(round_counter),
         .key_o        (nxt_round_key),
@@ -44,13 +45,13 @@ module aes128_encrypt(
     );
     
     round_tf u_nxt_enc_gen(
-        .clk   (clk),
-        .rst_n (rst_n),
-        .start (start_round_enc),
-        .b_i   (encryption_reg),
-        .b_sr_o(nxt_encryption_reg_sr),
-        .b_o   (nxt_encryption_reg),
-        .done_o(done_enc_round)
+        .clk    (clk),
+        .rst_n  (rst_n),
+        .start_i(start_round_enc),
+        .s_i    (encryption_reg),
+        .s_sr_o (nxt_encryption_reg_sr),
+        .s_o    (nxt_encryption_reg),
+        .done_o (done_enc_round)
     );
   
     // FSM Logic //
@@ -71,40 +72,40 @@ module aes128_encrypt(
     */
     always_ff @( posedge clk or negedge rst_n ) begin : fsm_control
         if (!rst_n) begin
-            done_o             <= 1'b0;
-            ready_o            <= 1'b1;
-            cipher_text_o      <= 128'b0;
-            encryption_reg     <= 128'b0;
-            round_key          <= 128'b0;
-            round_counter      <= 4'b0;
-            start_round_enc    <= 1'b0;
-            start_round_key    <= 1'b0;
-            aes_state          <= IDLE;
+            done_o           <= 1'b0;
+            ready_o          <= 1'b1;
+            cipher_text_o    <= 128'b0;
+            encryption_reg   <= 128'b0;
+            round_key        <= 128'b0;
+            round_counter    <= 4'b0;
+            start_round_enc  <= 1'b0;
+            start_round_key  <= 1'b0;
+            aes_s            <= IDLE_S;
         end else begin
 
             start_round_key <= 1'b0; 
             start_round_enc <= 1'b0;
 
-            case (aes_state)
-            IDLE: begin
+            case (aes_s)
+            IDLE_S: begin
                 done_o <= 1'b0;
                 if (start_i) begin
                     round_key       <= key_i;
                     encryption_reg  <= plain_text_i;
                     round_counter   <= 0;
                     ready_o         <= 1'b0;
-                    aes_state       <= INIT;
+                    aes_s           <= INIT_S;
                 end
             end
             
-            INIT: begin // Round 0 
+            INIT_S: begin // Round 0 
                 encryption_reg  <= encryption_reg ^ round_key; // First round Operation includes just a xor Op.
                 start_round_key <= 1'b1;
                 start_round_enc <= 1'b1;
-                aes_state       <= ROUND;
+                aes_s           <= ROUND_S;
             end
 
-            ROUND: begin // Round 1-9
+            ROUND_S: begin // Round 1-9
                 if(done_enc_round) begin // round_tf takes 16 cycles 
                     encryption_reg    <= nxt_encryption_reg ^ nxt_round_key; 
                     round_key         <= nxt_round_key;
@@ -113,20 +114,20 @@ module aes128_encrypt(
                     start_round_enc   <= 1'b1;
                 end
 
-                aes_state <= (round_counter == 9) ? FIN : ROUND; 
+                aes_s <= (round_counter == 9) ? FIN_S : ROUND_S; 
             end
 
-            FIN: begin // Round 10
+            FIN_S: begin // Round 10
                 if(done_enc_round) begin
                     cipher_text_o <= nxt_encryption_reg_sr ^ nxt_round_key; // Final round doesn't use Mix Columns
-                    aes_state      <= IDLE;
                     done_o        <= 1'b1;
                     ready_o       <= 1'b1;
                     round_counter <= 0;
+                    aes_s         <= IDLE_S;
                 end
             end
 
-            default: aes_state <= IDLE;
+            default: aes_s <= IDLE_S;
 
         endcase
         end
