@@ -11,7 +11,8 @@ module inv_round_tf (
     logic [127:0] s_mc; 
     logic [127:0] s_sr_in;
     logic [127:0] s_sr_out_reg;
-    
+    logic start_reg;
+
     mix_columns  #(
         .OP(1'b0)
     ) u_mc(
@@ -29,7 +30,13 @@ module inv_round_tf (
         .s_o(s_sr_out_reg)
     );
     
-    // In case of timing problems add a pipe after the sub bytes
+    always_ff @( posedge clk ) begin
+      if (!rst_n) begin
+        start_reg <= 1'b0;
+      end else begin
+        start_reg <= start_i;  
+      end
+    end
 
     sub_bytes #(
       .WIDTH(128),
@@ -37,7 +44,7 @@ module inv_round_tf (
     )  u_sbox(
       .clk(clk),
       .rst_n(rst_n),
-      .start_i(start_i),
+      .start_i(start_reg),
       .s_i(s_sr_out_reg),
       .s_o(s_o),
       .done_o(done_o)

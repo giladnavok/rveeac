@@ -18,6 +18,7 @@ module round_key_tf #(
 
     logic [31:0] w [3:0];
     logic [31:0] w_tf [3:0];
+    logic done_reg;
 
     // unpack key_i into w[0]…w[3]
     genvar i;
@@ -39,8 +40,17 @@ module round_key_tf #(
       .start_i(start_i),
       .s_i(rot_w),
       .s_o(sb_w),
-      .done_o(done_o)
+      .done_o(done_reg)
     );
+
+    // Added pipe to insure timing 
+    always_ff @( posedge clk ) begin
+      if (!rst_n) begin
+        done_o <= 1'b0;
+      end else begin
+        done_o <= done_reg;  
+      end
+    end
 
     // Check Timing here, may need to split into stages
     assign w_tf[0] = w[0] ^ sb_w ^ RCON[round_count_i];

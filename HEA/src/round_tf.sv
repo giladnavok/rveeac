@@ -10,6 +10,8 @@ module round_tf (
   
     logic [127:0] s_sb; // s_sb = in s-box
     
+    logic done_reg;
+
     sub_bytes #(
       .WIDTH(128),
       .OP(1'b1)
@@ -20,10 +22,18 @@ module round_tf (
       .start_i(start_i),
       .s_i(s_i),
       .s_o(s_sb),
-      .done_o(done_o)
+      .done_o(done_reg)
     );
     
-    // In case of timing problems add a pipe after the sub bytes
+    // Added pipe to insure timing 
+    always_ff @( posedge clk ) begin
+      if (!rst_n) begin
+        done_o <= 1'b0;
+      end else begin
+        done_o <= done_reg;  
+      end
+    end
+    
     logic [127:0] s_sr; 
 
     shift_rows #(.OP(1'b1)) u_sr(

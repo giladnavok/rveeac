@@ -25,7 +25,9 @@ module aes128_core (
     logic [127:0] enc_text_o, dec_text_o;
     logic         enc_ready, enc_done;
     logic         dec_ready, dec_done;
-
+    
+    logic done_pulse;
+    
     // Encryption unit
     aes128_encrypt u_enc_unit (
         .clk            (clk),
@@ -53,19 +55,17 @@ module aes128_core (
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             text_o    <= 128'b0;
-            done_o    <= 1'b0;
             ready_o   <= 1'b0;
             aes_s     <= IDLE;
         end else begin
             // drive ready/done
             ready_o <= enc_ready && dec_ready;  // only valid when neither unit is running
-            done_o  <= enc_done  || dec_done;
 
             case (aes_s)
                 IDLE: begin
-                    if (start_enc_i)
+                    if (start_enc_i && ready_o)
                         aes_s <= ENCRYPT;
-                    else if (start_dec_i)
+                    else if (start_dec_i && ready_o)
                         aes_s <= DECRYPT;
                 end
 
@@ -87,5 +87,20 @@ module aes128_core (
             endcase
         end
     end
+    
+    always_ff @(posedge clk or negedge rst_n) begin
+      if (!rst_n) begin
+        done_pulse <= 1'b0;
+      end else begin
+      
+        done_pulse <= 1'b0;
+        
+        if (enc_done || dec_done) begin
+            done_pulse <= 1'b1;
+        end   
+      end     
+    end
+
+    assign done_o = done_pulse;
 
 endmodule
