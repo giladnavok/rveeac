@@ -1,4 +1,3 @@
-`timescale 1ns / 1ps
 module shift_rows #( 
     parameter bit OP = 1 // 1 - Encrypt , 0 - Decrypt
   )(

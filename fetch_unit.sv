@@ -157,19 +157,7 @@ always_ff @(posedge clk or negedge rst_n) begin
 			end
 
 			ST_FULL_BUFFER: begin
-				if (branch_i) begin //maybe currently impossible
-					if (take_branch) begin
-						pc_current <= imem_apb_fetch_address;
-						state_e <= ST_FETCH_SPEC;
-					end else begin 
-						if (ready_i) begin
-							pc_current <= imem_apb_fetch_address;
-							state_e <= ST_FETCH_SPEC;
-						end else begin
-							state_e <= ST_FULL_BUFFER_SPEC;
-						end
-					end
-				end else if (ready_i) begin
+				if (ready_i) begin
 					pc_current <= imem_apb_fetch_address;
 					state_e <= inst_in_buffer_branch_jmp? ST_INIT_FETCH : ST_FETCH;
 				end

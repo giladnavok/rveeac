@@ -155,18 +155,18 @@ regfile_sbm regfile (
 
 );
 
-accel_dummy_sbm accel (
-	.clk(clk),
-	.rst_n(rst_n),
-	.load_key_i(accel_load_key),
-	.start_enc_i(accel_start_enc),
-	.start_dec_i(accel_start_dec),
+aes128_core accel (
+    .clk(clk),
+    .rst_n(rst_n),
 
+    .load_key_i(accel_load_key),
+    .start_enc_i(accel_start_enc),
+    .start_dec_i(accel_start_dec),
 	.data_i(accel_data_in),
+
 	.data_o(accel_data_out),
 	.ready_o(accel_ready),
-	.done_o(accel_done),
-	.rf_en_o(accel_rf_write_en)
+	.done_o(accel_rf_write_en)
 );
 
 // ===============================
@@ -189,7 +189,7 @@ always_comb begin
 end
 
 assign transfer_start = load_store_done && ((valid_i && (first_cycle && cs_i.en.dmem_store)) || dmem_load_bypass_i);
-assign rs16_h_sel = (!first_cycle && !shift_bigger_then_16_o) ^ cs_i.en.rs16_half_order_flip;
+assign rs16_h_sel = cs_i.en.reg16_use && (!first_cycle && !shift_bigger_then_16_o) ^ cs_i.en.rs16_half_order_flip;
 assign lsu_addr = (cs_i.en.dmem_store && !dmem_load_bypass_i) ? lsu_store_addr_i : load_addr_bypass_i;
 assign load_store_write = cs_i.en.dmem_store && !dmem_load_bypass_i;
 

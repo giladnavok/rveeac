@@ -194,17 +194,17 @@ always_ff @(posedge clk or negedge rst_n) begin
 			if (cs.dec.en.cs_exe) begin
 				cs_exe_o <= cs.exe;
 			end
-			if (cs.dec.en.reg16_use && first_cycle) begin
+			if (cs.exe.en.reg16_use && first_cycle) begin
 				rs16_o <= rs1;
 			end
 			if (cs.exe.en.rf_write) begin
 				rd_o <= rd;
 			end
 		end else if (misspredict_i) begin
-			cs_exe_o <= CS_EXE_EN_DEFAULT;
+			cs_exe_o.en <= CS_EXE_EN_DEFAULT;
 			exe_first_cycle_o <= 1'b0;
 		end else if (state_e == ST_WAIT_FETCH) begin
-			cs_exe_o <= ready_i ? CS_EXE_EN_DEFAULT : cs_exe_o;
+			cs_exe_o.en <= ready_i ? CS_EXE_EN_DEFAULT : cs_exe_o;
 		end 
 	end
 end

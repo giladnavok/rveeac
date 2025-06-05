@@ -115,7 +115,6 @@ package typedefs;
 		logic wb;
 		logic cs_exe;
 		logic reg32_use;
-		logic reg16_use;
 		logic dmem_load_bypass;
 		logic jmp;
 		logic branch;
@@ -140,6 +139,7 @@ package typedefs;
 		logic cmp_req;
 		logic cmp_flip;
 		logic wb_order_flip;
+		logic reg16_use;
 		logic rs16_half_order_flip;
 		logic accel_start_enc;
 		logic accel_start_dec;
@@ -233,7 +233,6 @@ package typedefs;
 			lsu_addr: DISABLE,
 			alu_b: DISABLE,
 			wb: DISABLE,
-			reg16_use: DISABLE,
 			reg32_use: DISABLE,
 			cs_exe: ENABLE,
 			dmem_load_bypass: DISABLE,
@@ -248,6 +247,7 @@ package typedefs;
 			cmp_req: DISABLE,
 			cmp_flip: DISABLE,
 			wb_order_flip: DISABLE,
+			reg16_use: DISABLE,
 			rs16_half_order_flip: DISABLE,
 			accel_start_enc: DISABLE,
 			accel_start_dec: DISABLE,

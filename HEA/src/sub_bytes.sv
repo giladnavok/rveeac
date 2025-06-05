@@ -1,5 +1,3 @@
-`timescale 1ns / 1ps
-
 module sub_bytes #(
     parameter WIDTH = 128,
     parameter OP = 1

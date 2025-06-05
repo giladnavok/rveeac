@@ -128,7 +128,6 @@ always_comb begin
 			// Enable //
 			cs_o.dec.en.alu_b = ENABLE;
 			cs_o.dec.en.reg32_use = ENABLE;
-			cs_o.dec.en.reg16_use = ENABLE;
 			cs_o.dec.en.branch = ENABLE;
 
 			// Execution Stage //
@@ -136,6 +135,9 @@ always_comb begin
 			// Sel //
 			cs_o.exe.en.cmp_req = ENABLE;
 			cs_o.exe.en.cmp_flip = funct3_i[0];
+			// Enable //
+			cs_o.exe.en.reg16_use = ENABLE;
+
 			case (funct3_branch_e'(funct3_i))
 				FNC3_BEQ, FNC3_BNE: begin
 					cs_o.exe.sel.alu_op = ALU_OP_EQ;
@@ -229,7 +231,6 @@ always_comb begin
 			cs_o.dec.sel.ser_start = SER_START_LH;
 			// Enable //
 			cs_o.dec.en.alu_b = ENABLE;
-			cs_o.dec.en.reg16_use = ENABLE;
 			cs_o.dec.en.reg32_use = opcode_i[5];
 
 			// Execution Stage //
@@ -239,6 +240,7 @@ always_comb begin
 			cs_o.exe.sel.wb_store_size = SIZE_W;
 			// Enable //
 			cs_o.exe.en.rf_write = ENABLE;
+			cs_o.exe.en.reg16_use = ENABLE;
 			case (funct3_operation_e'(funct3_i))
 				FNC3_OP_ADD: begin  
 					cs_o.exe.sel.alu_op = (funct7_i[5] && opcode_i[5])  ? ALU_OP_SUB : ALU_OP_ADD;
