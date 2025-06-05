@@ -6,13 +6,14 @@ module aes128_core (
     // Input Controls
     input  logic          start_enc_i,
     input  logic          start_dec_i,
-
+    input  logic          load_key_i,
     // Input Data
-    input  logic [127:0]  key_i,
-    input  logic [127:0]  text_i,
+    // input  logic [127:0]  key_i,
+
+    input  logic [127:0]  data_i,
 
     // Output Data
-    output logic [127:0]  text_o,
+    output logic [127:0]  data_o,
     output logic          ready_o,
     output logic          done_o
 );
@@ -23,6 +24,7 @@ module aes128_core (
 
     // Internal wires
     logic [127:0] enc_text_o, dec_text_o;
+    logic [127:0] key;
     logic         enc_ready, enc_done;
     logic         dec_ready, dec_done;
     
@@ -33,8 +35,8 @@ module aes128_core (
         .clk            (clk),
         .rst_n          (rst_n),
         .start_i        (start_enc_i),
-        .key_i          (key_i),
-        .plain_text_i   (text_i),
+        .key_i          (key),
+        .plain_text_i   (data_i),
         .cipher_text_o  (enc_text_o),
         .done_o         (enc_done),
         .ready_o        (enc_ready)
@@ -45,8 +47,8 @@ module aes128_core (
         .clk             (clk),
         .rst_n           (rst_n),
         .start_i         (start_dec_i),
-        .key_i           (key_i),
-        .cipher_text_i   (text_i),
+        .key_i           (key),
+        .cipher_text_i   (data_i),
         .plain_text_o    (dec_text_o),
         .done_o          (dec_done),
         .ready_o         (dec_ready)
@@ -54,8 +56,8 @@ module aes128_core (
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            text_o    <= 128'b0;
             ready_o   <= 1'b0;
+            key       <= 128'b0;
             aes_s     <= IDLE;
         end else begin
             // drive ready/done
@@ -63,7 +65,8 @@ module aes128_core (
 
             case (aes_s)
                 IDLE: begin
-                    if (start_enc_i && ready_o)
+                    if (load_key_i) key <= data_i;
+                    else if (start_enc_i && ready_o)
                         aes_s <= ENCRYPT;
                     else if (start_dec_i && ready_o)
                         aes_s <= DECRYPT;
@@ -71,15 +74,17 @@ module aes128_core (
 
                 ENCRYPT: begin
                     if (enc_done) begin
-                        text_o    <= enc_text_o;
+                        // data_o    <= enc_text_o;
                         aes_s     <= IDLE;
+                        // done_o    <= 1'b1;
                     end
                 end
 
                 DECRYPT: begin
                     if (dec_done) begin
-                        text_o    <= dec_text_o;
+                        // data_o    <= dec_text_o;
                         aes_s     <= IDLE;
+                        // done_o    <= 1'b1;
                     end
                 end
 
@@ -88,19 +93,26 @@ module aes128_core (
         end
     end
     
-    always_ff @(posedge clk or negedge rst_n) begin
-      if (!rst_n) begin
-        done_pulse <= 1'b0;
-      end else begin
-      
-        done_pulse <= 1'b0;
-        
-        if (enc_done || dec_done) begin
-            done_pulse <= 1'b1;
-        end   
-      end     
+    always_comb begin
+        data_o = 128'b0;
+        done_o = enc_done || dec_done;
+        if (enc_done) data_o = enc_text_o;
+        else if (dec_done) data_o = dec_text_o;
     end
 
-    assign done_o = done_pulse;
+    // always_ff @(posedge clk or negedge rst_n) begin
+    //   if (!rst_n) begin
+    //     done_pulse <= 1'b0;
+    //   end else begin
+      
+    //     done_pulse <= 1'b0;
+        
+    //     if (enc_done || dec_done) begin
+    //         done_pulse <= 1'b1;
+    //     end   
+    //   end     
+    // end
+
+    // assign done_o = done_pulse;
 
 endmodule
