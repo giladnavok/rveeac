@@ -1,4 +1,11 @@
-module aes128_core (
+module aes128_core #(
+
+    parameter SBOX_PAR_KEY = 4,
+    parameter SBOX_PAR_ROUND = 16,
+    parameter SBOX_PAR_INV_ROUND = 16
+
+)
+(
     // General Signals
     input  logic          clk,
     input  logic          rst_n,
@@ -31,7 +38,8 @@ module aes128_core (
     logic done_pulse;
     
     // Encryption unit
-    aes128_encrypt u_enc_unit (
+    aes128_encrypt #(.SBOX_PAR_KEY(SBOX_PAR_KEY),.SBOX_PAR_ROUND(SBOX_PAR_ROUND))
+    u_enc_unit (
         .clk            (clk),
         .rst_n          (rst_n),
         .start_i        (start_enc_i),
@@ -43,7 +51,8 @@ module aes128_core (
     );
 
     // Decryption unit
-    aes128_decrypt u_dec_unit (
+    aes128_decrypt #(.SBOX_PAR_KEY(SBOX_PAR_KEY),.SBOX_PAR_INV_ROUND(SBOX_PAR_INV_ROUND))
+    u_dec_unit (
         .clk             (clk),
         .rst_n           (rst_n),
         .start_i         (start_dec_i),
@@ -74,17 +83,13 @@ module aes128_core (
 
                 ENCRYPT: begin
                     if (enc_done) begin
-                        // data_o    <= enc_text_o;
                         aes_s     <= IDLE;
-                        // done_o    <= 1'b1;
                     end
                 end
 
                 DECRYPT: begin
                     if (dec_done) begin
-                        // data_o    <= dec_text_o;
                         aes_s     <= IDLE;
-                        // done_o    <= 1'b1;
                     end
                 end
 
@@ -100,19 +105,5 @@ module aes128_core (
         else if (dec_done) data_o = dec_text_o;
     end
 
-    // always_ff @(posedge clk or negedge rst_n) begin
-    //   if (!rst_n) begin
-    //     done_pulse <= 1'b0;
-    //   end else begin
-      
-    //     done_pulse <= 1'b0;
-        
-    //     if (enc_done || dec_done) begin
-    //         done_pulse <= 1'b1;
-    //     end   
-    //   end     
-    // end
-
-    // assign done_o = done_pulse;
 
 endmodule

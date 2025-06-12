@@ -14,7 +14,8 @@ module sub_bytes_tb;
   logic [127:0] expected=128'h638293c31bfc33f5c4eeacea4bc12816;
   
   // Instantiate SubBytes module
-  sub_bytes uut (
+  sub_bytes  #(.OP(1), .WIDTH(128), .PAR(16))
+  uut (
     .clk    (clk),
     .rst_n  (rst_n),
     .s_i    (s_i),
@@ -49,8 +50,9 @@ module sub_bytes_tb;
     start = 0;
 
     // Wait for 17 cycles (16 bytes + done cycle)
-    repeat (20) @(posedge clk);
-
+    wait (done == 1'b1);
+    repeat (2) @(posedge clk);
+    
     assert (s_o == expected)
 
     // Display results

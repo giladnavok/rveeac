@@ -1,4 +1,7 @@
-module inv_round_tf (
+module inv_round_tf #(
+    parameter SBOX_PAR = 16
+)
+(
     input  logic clk,
     input  logic rst_n,
     input  logic start_i,
@@ -40,6 +43,7 @@ module inv_round_tf (
 
     sub_bytes #(
       .WIDTH(128),
+      .PAR(SBOX_PAR),
       .OP(1'b0)
     )  u_sbox(
       .clk(clk),

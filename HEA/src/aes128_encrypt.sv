@@ -1,4 +1,7 @@
-module aes128_encrypt(
+module aes128_encrypt #(
+    parameter SBOX_PAR_KEY = 4,
+    parameter SBOX_PAR_ROUND = 16
+)(
     // General Signals //
 	// --------------- //
     input  logic clk,
@@ -34,7 +37,9 @@ module aes128_encrypt(
 
     // Components //
 	// ---------- //
-    round_key_tf u_nxt_key_gen(
+    round_key_tf #(.SBOX_PAR(SBOX_PAR_KEY))
+    u_nxt_key_gen
+    (
         .clk          (clk),
         .rst_n        (rst_n),
         .start_i      (start_round_key),
@@ -44,7 +49,9 @@ module aes128_encrypt(
         .done_o       (done_key_gen)
     );
     
-    round_tf u_nxt_enc_gen(
+    round_tf #(.SBOX_PAR(SBOX_PAR_ROUND))
+    u_nxt_enc_gen
+    (
         .clk    (clk),
         .rst_n  (rst_n),
         .start_i(start_round_enc),
