@@ -1,5 +1,9 @@
 module sub_bytes #(
     parameter WIDTH = 128,
+    // PARALLELISM: number of bytes processed per cycle (1,2,4,8,16)
+    //   - Throughput: performs PAR simultaneous S-box lookups each cycle, increasing bytes/cycle.
+    //   - Resource tradeoff: S-box ROM is replicated PAR times, so memory/LUT usage scales linearly with PAR.
+    parameter PAR = 16,
     parameter OP = 1
 )
 (
@@ -11,23 +15,41 @@ module sub_bytes #(
     output logic [WIDTH-1:0] s_o,
     output logic done_o
 
-    );
+);
 
-// Current working s-box using a simple 256x8 ROM, simpler to implement but more expensive
-    logic [7:0] sbox_table [0:255];
-    if (OP) begin
-        initial $readmemh("sbox_table.mem", sbox_table);
-    end else begin
-        initial $readmemh("inv_sbox_table.mem", sbox_table);
+
+    // Parameter sanity checks
+    initial begin
+        if (WIDTH % 8 != 0) begin
+            $error("WIDTH (%0d) must be a multiple of 8", WIDTH);
+        end
+        if (!(PAR == 1 || PAR == 2 || PAR == 4 || PAR == 8 || PAR == 16)) begin
+            $error("Invalid PAR=%0d, must be one of {1,2,4,8,16}", PAR);
+        end
+        if (PAR > num_of_bytes) begin
+            $error("PAR (%0d) cannot exceed NUM_BYTES (%0d)", PAR, num_of_bytes);
+        end
+        if (num_of_bytes % PAR != 0) begin
+            $error("num_of_bytes (%0d) must be divisible by PAR (%0d)", num_of_bytes, PAR);
+        end
     end
+
     
+    logic [7:0] sbox_table [0:255];
+
+    // Initialize ROM
+    initial begin
+        if (OP) // Encrypt
+            $readmemh("sbox_table.mem", sbox_table);
+        else   // Decrypt
+            $readmemh("inv_sbox_table.mem", sbox_table);
+    end
 
     typedef enum logic [2:0] { IDLE_S, RUN_S, DONE_S} s_box_t;
     s_box_t s_box_s;
 
-    localparam num_of_bytes = WIDTH / 8;
     logic [3:0] byte_idx;
-
+    localparam num_of_bytes = WIDTH / 8;
     logic [WIDTH-1:0] temp_res;
     
     always_ff @( posedge clk or negedge rst_n ) begin : s_box
@@ -49,9 +71,12 @@ module sub_bytes #(
                 end 
 
                 RUN_S: begin
-                    temp_res[byte_idx*8 +: 8] <= sbox_table[s_i[byte_idx*8 +: 8]];
-                    byte_idx <= byte_idx + 1;
-                    s_box_s  <= (byte_idx == num_of_bytes-1) ? DONE_S : RUN_S;
+                    integer k;
+                    for (k = 0;k < PAR; k++) begin
+                        temp_res[(byte_idx+k)*8 +: 8] <= sbox_table[s_i[(byte_idx+k)*8 +: 8]];
+                    end
+                    byte_idx <= byte_idx + PAR;
+                    s_box_s  <= (byte_idx == num_of_bytes - PAR) ? DONE_S : RUN_S;
                 end
 
                 DONE_S: begin

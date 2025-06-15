@@ -1,5 +1,5 @@
 module round_key_tf #( 
-    parameter bit EN_MC = 1 // enable mix columns
+    parameter SBOX_PAR = 4 
   )(
     input  logic clk,
     input  logic rst_n,
@@ -33,6 +33,7 @@ module round_key_tf #(
 
     sub_bytes #(
       .WIDTH(32),
+      .PAR(SBOX_PAR),
       .OP(1'b1)
     ) u_sbox (
       .clk(clk),

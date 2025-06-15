@@ -19,7 +19,12 @@ module tb_aes128_core;
     logic done_o;
 
     // Instantiate the DUT
-    aes128_core dut (
+    aes128_core #(
+        .SBOX_PAR_KEY(4),
+        .SBOX_PAR_INV_ROUND(16),
+        .SBOX_PAR_ROUND(16)
+    )
+    dut (
         .clk         (clk),
         .rst_n       (rst_n),
         .load_key_i  (load_key_i),
@@ -89,6 +94,7 @@ module tb_aes128_core;
 
         // Wait for done_o (encryption done)
         wait (done_o == 1'b1);
+        data_i = data_o;
         @(posedge clk);  // capture data_o on next clock
 
 //        $display("[%0t] Encryption done. "
@@ -106,7 +112,6 @@ module tb_aes128_core;
         // 3) Start decryption with the ciphertext just produced
         //--------------------------------------------------------------------------
         @(posedge clk);
-        data_i       = data_o;
         start_dec_i  = 1'b1;
         @(posedge clk);
         start_dec_i  = 1'b0;
