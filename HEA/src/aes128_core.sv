@@ -56,12 +56,9 @@ module aes128_core (
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            ready_o   <= 1'b0;
             key       <= 128'b0;
             aes_s     <= IDLE;
         end else begin
-            // drive ready/done
-            ready_o <= enc_ready && dec_ready;  // only valid when neither unit is running
 
             case (aes_s)
                 IDLE: begin
@@ -95,6 +92,8 @@ module aes128_core (
     
     always_comb begin
         data_o = 128'b0;
+		// drive ready/done
+		ready_o = enc_ready && dec_ready;  // only valid when neither unit is running
         done_o = enc_done || dec_done;
         if (enc_done) data_o = enc_text_o;
         else if (dec_done) data_o = dec_text_o;

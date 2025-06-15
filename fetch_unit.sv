@@ -57,7 +57,6 @@ logic [31:0] pc_current;
 logic [31:0] branch_alternative;
 logic [31:0] inst_buffer;
 logic inst_in_buffer_branch_jmp;
-logic misspredict_d;
 logic branch_taken;
 
 enum logic [2:0] {
@@ -157,8 +156,13 @@ always_ff @(posedge clk or negedge rst_n) begin
 			end
 
 			ST_FULL_BUFFER: begin
-				if (ready_i) begin
+				if (jmp_i || (branch_i && take_branch)) begin
 					pc_current <= imem_apb_fetch_address;
+					state_e <= branch_i ? ST_FETCH_SPEC : ST_FETCH;
+				end else if (ready_i) begin
+					if (!inst_in_buffer_branch_jmp) begin
+						pc_current <= imem_apb_fetch_address;
+					end
 					state_e <= inst_in_buffer_branch_jmp? ST_INIT_FETCH : ST_FETCH;
 				end
 			end
@@ -217,26 +221,14 @@ always_ff @(posedge clk or negedge rst_n) begin
 					end
 				end else if (ready_i) begin
 					pc_current <= imem_apb_fetch_address;
-					if (inst_in_buffer_branch_jmp) begin
-						state_e <= branch_cmp_result_valid_i ? 
-							ST_INIT_FETCH : ST_INIT_FETCH_SPEC;
-					end else begin
-						state_e <= branch_cmp_result_valid_i ? 
-							ST_FETCH : ST_FETCH_SPEC;
-					end
+					state_e <= inst_in_buffer_branch_jmp ? 
+						ST_INIT_FETCH_SPEC : ST_FETCH_SPEC;
 				end else begin
 					state_e <= branch_cmp_result_valid_i ? 
 						ST_FULL_BUFFER : ST_FULL_BUFFER_SPEC;
 				end
 			end
 		endcase
-	end
-end
-always_ff @(posedge clk or negedge rst_n) begin
-	if (!rst_n) begin
-		misspredict_d <= 1'b0;
-	end else begin
-		misspredict_d <= branch_cmp_result_valid_i && (branch_taken != branch_cmp_result_i);
 	end
 end
 // ===============================
@@ -263,10 +255,16 @@ always_comb begin
 			valid_o = 1'b1;
 			inst_o = inst_buffer;
 			pc_o = pc_current;
-			imem_apb_start = ready_i && !inst_in_buffer_branch_jmp;
-			if (jmp_i | (branch_i & take_branch)) begin
+			imem_apb_start = 1'b0;
+			imem_apb_fetch_address = 32'bx;
+			if (jmp_i || (branch_i && take_branch)) begin
+				valid_o = 1'b0;
+				inst_o = 32'bx;
+				pc_o = 32'bx;
+				imem_apb_start = 1'b1;
 				imem_apb_fetch_address = jmp_target_i;
-			end else begin
+			end else if (ready_i) begin
+				imem_apb_start = !inst_in_buffer_branch_jmp;
 				imem_apb_fetch_address = pc_next;
 			end
 		end
@@ -277,7 +275,7 @@ always_comb begin
 			imem_apb_start = 1'b1;
 			if (branch_cmp_result_valid_i) begin
 				if (branch_cmp_result_i == branch_taken) begin
-					imem_apb_fetch_address = (jmp_i || branch_i)  ? jmp_target_i : pc_current;
+					imem_apb_fetch_address = (jmp_i || (branch_i && take_branch))  ? jmp_target_i : pc_current;
 				end else begin
 					imem_apb_fetch_address = branch_alternative;
 				end
