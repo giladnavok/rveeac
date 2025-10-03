@@ -35,6 +35,7 @@ logic [4:0] dec_rd_out;
 logic [4:0] dec_rs32_out;
 logic [4:0] dec_rs16_out;
 logic dec_inst31_out;
+logic dec_stall_for_jmp_target;
 
 logic exe_ready;
 logic exe_cmp_result_valid;
@@ -42,7 +43,7 @@ logic exe_cmp_result;
 logic [31:0] exe_reg32_out;
 logic exe_first_cycle;
 logic exe_shift_bigger_then_16;
-logic exe_dmem_apb_ready;
+logic exe_dmem_apb_ready_d;
 
 //logic dec_flush;
 //logic [1:0] speculative_cycle_counter;
@@ -76,6 +77,7 @@ fetch_unit fetch (
 	.ready_i(dec_ready),
 	.branch_cmp_result_valid_i(exe_cmp_result_valid),
 	.inst31_i(dec_inst31_out),
+	.stall_for_jmp_target_i(dec_stall_for_jmp_target),
 
 	.imem_apb(imem_apb),
 
@@ -95,7 +97,7 @@ decode_unit decode (
 
 	.ready_i(exe_ready),
 	.valid_i(fetch_valid),
-	.exe_dmem_apb_ready_i(exe_dmem_apb_ready),
+	.exe_dmem_apb_ready_d_i(exe_dmem_apb_ready_d),
 	.misspredict_i(fetch_misspredict),
 
 	.inst_i(fetch_inst_out),
@@ -109,6 +111,7 @@ decode_unit decode (
 	.valid_o(dec_valid),
 	.dmem_load_bypass_o(dec_dmem_load_bypass),
 	.exe_first_cycle_o(exe_first_cycle),
+	.fetch_stall_for_jmp_target_o(dec_stall_for_jmp_target),
 
 	.lsu_store_addr_o(dec_lsu_store_addr_out),
 	.lsu_load_addr_bypass_o(dec_lsu_load_addr_bypass),
@@ -150,7 +153,7 @@ exe_mem_wb_stage exe_mem_wb (
 	`endif
 
 	.cmp_result_valid_o(exe_cmp_result_valid),
-	.dmem_apb_ready_o(exe_dmem_apb_ready)
+	.dmem_apb_ready_d_o(exe_dmem_apb_ready_d)
 );
 endmodule
 

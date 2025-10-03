@@ -8,7 +8,7 @@ module decode_unit (
 	// --------- Input Controls  --------
 	input logic ready_i, 						///< Execution stage can accept controls and data
 	input logic valid_i, 						///< Input data from IF stage is valid
-	input logic exe_dmem_apb_ready_i, 				///<  !!!!
+	input logic exe_dmem_apb_ready_d_i, 				///<  !!!!
 	input logic misspredict_i, 				///<  !!!!
 	
 
@@ -25,6 +25,7 @@ module decode_unit (
 	output logic valid_o, 						///< Control signals and output data for execution stage are valid
 	output logic dmem_load_bypass_o, 			///< Bypass to execution stage - start read transfer
 	output logic exe_first_cycle_o, 			///< First cycle signal for execution stage
+	output logic fetch_stall_for_jmp_target_o,
 
 	// --------- Output Data  -----------
 	output logic [31:0] lsu_store_addr_o, 		///< Store address for LSU - FF
@@ -250,7 +251,8 @@ assign store_load_stall =
 	( 
 		cs.dec.en.dmem_load_bypass && 
 		cs_exe_o.en.dmem_store &&
-		!ready_i
+		ready_i &&
+		!exe_dmem_apb_ready_d_i
 	);
 
 assign full_read_after_write = 
@@ -303,6 +305,7 @@ always_comb begin
 	lsu_load_addr_bypass_o = '0;
 	dmem_load_bypass_o = 1'b0;
 	rs32_o = rs32_d;
+	fetch_stall_for_jmp_target_o = stall_one_cycle && full_read_after_write && cs.dec.en.jmp;
 	case (state_e)
 		ST_ISSUE_FIRST: begin
 			if (ready_i || !stall_one_cycle || misspredict_i) begin

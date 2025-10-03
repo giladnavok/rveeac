@@ -30,7 +30,7 @@ module exe_mem_wb_stage #(
 
 	// --------- Output Controls --------
 	output logic ready_o, 						///< Execution stage ready for new controls and data
-	output logic dmem_apb_ready_o, 						///< Execution stage ready for new controls and data
+	output logic dmem_apb_ready_d_o, 						///< Execution stage ready for new controls and data
 
 	// --------- Output Data --------- 
 	output logic [31:0] reg32_o, 				///< Register file 32 bit read port data
@@ -50,7 +50,6 @@ module exe_mem_wb_stage #(
 // LSU 
 logic load_store_write;
 logic load_store_apb_ready;
-logic load_store_done;
 logic load_store_valid;
 logic load_store_half;
 logic load_store_err;
@@ -58,6 +57,8 @@ logic load_store_load_data;
 logic transfer_start;
 logic [15:0] lsu_out;
 logic [31:0] lsu_addr;
+
+logic load_store_ready;
 
 // ALU
 logic [15:0] alu_out;
@@ -106,7 +107,7 @@ load_store_unit load_store (
 	.addr_i(lsu_addr),
 
 	.apb_ready_o(load_store_apb_ready),
-	.done_o(load_store_done),
+	.ready_o(load_store_ready),
 	.valid_o(load_store_valid),
 	.half_o(load_store_half),
 	.err_o(load_store_err),
@@ -178,6 +179,13 @@ always_ff @(posedge clk or negedge rst_n) begin
 	else first_cycle_d <= first_cycle;
 end
 
+always_ff @(posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		dmem_apb_ready_d_o <= 1'b1;
+	end else begin
+		dmem_apb_ready_d_o <= !transfer_start && load_store_apb_ready;
+	end
+end
 
 // Regfile WB data mux
 always_comb begin
@@ -188,7 +196,7 @@ always_comb begin
 	endcase
 end
 
-assign transfer_start = load_store_done && ((valid_i && (first_cycle && cs_i.en.dmem_store)) || dmem_load_bypass_i);
+assign transfer_start = load_store_apb_ready && ((valid_i && (first_cycle && cs_i.en.dmem_store)) || dmem_load_bypass_i);
 assign rs16_h_sel = cs_i.en.reg16_use && (!first_cycle && !shift_bigger_then_16_o) ^ cs_i.en.rs16_half_order_flip;
 assign lsu_addr = (cs_i.en.dmem_store && !dmem_load_bypass_i) ? lsu_store_addr_i : load_addr_bypass_i;
 assign load_store_write = cs_i.en.dmem_store && !dmem_load_bypass_i;
@@ -211,9 +219,8 @@ always_comb begin
 	end
 end
 
-assign ready_o = cmp_result_valid_o || (accel_ready && load_store_done && !first_cycle);
+assign ready_o = cmp_result_valid_o || (accel_ready && load_store_ready && !first_cycle);
 assign reg32_o = reg32_data;
-assign dmem_apb_ready_o = load_store_apb_ready;
 
 endmodule
 

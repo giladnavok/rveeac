@@ -14,6 +14,7 @@ module fetch_unit # (
 	input logic branch_i,			 		///< Valid branch decoded in ID stage
 	input logic ready_i, 					///< Downstream stage can accept inst
 	input logic branch_cmp_result_valid_i,  ///< Comperator result valid
+	input logic stall_for_jmp_target_i,  
 
 	//--
 	apb_if.master imem_apb, 				///< IMEM APB Interface
@@ -127,12 +128,15 @@ always_ff @(posedge clk or negedge rst_n) begin
 	end else begin
 		case (state_e)
 			ST_INIT_FETCH: begin
-				pc_current <= imem_apb_fetch_address;
-				if (branch_i) begin
+				if (stall_for_jmp_target_i) begin
+					state_e <= ST_INIT_FETCH;
+				end else if (branch_i) begin
+					pc_current <= imem_apb_fetch_address;
 					state_e <= ST_FETCH_SPEC;
 					branch_taken <= take_branch;
 					branch_alternative <= take_branch ? pc_current : jmp_target_i;
 				end else begin
+					pc_current <= imem_apb_fetch_address;
 					state_e <= ST_FETCH;
 				end
 			end
@@ -178,6 +182,8 @@ always_ff @(posedge clk or negedge rst_n) begin
 						//state_e <= branch_i ? ST_FULL_BUFFER_SPEC : ST_FULL_BUFFER;
 						state_e <= ST_FULL_BUFFER;
 					end
+				end else if (jmp_i) begin
+					state_e <= ST_FETCH_DISCARD;
 				end
 			end
 			ST_FETCH_SPEC: begin
@@ -244,7 +250,7 @@ always_comb begin
 			valid_o = 1'b0;
 			inst_o = 32'hxxxxxxxx;
 			pc_o = 32'hxxxxxxxx;
-			imem_apb_start = 1'b1;
+			imem_apb_start = !stall_for_jmp_target_i;
 			if (jmp_i | (branch_i & take_branch)) begin
 				imem_apb_fetch_address = jmp_target_i;
 			end else begin
@@ -287,14 +293,17 @@ always_comb begin
 			valid_o = 1'b1;
 			inst_o = inst_buffer;
 			pc_o = pc_current;
-			imem_apb_start = (ready_i || branch_cmp_result_valid_i) && !inst_in_buffer_branch_jmp;
+			//imem_apb_start = (ready_i || branch_cmp_result_valid_i) && (!(inst_in_buffer_branch_jmp && (branch_cmp_result_i == branch_taken)));
 			if (branch_cmp_result_valid_i) begin
 				if (branch_cmp_result_i == branch_taken) begin 
+					imem_apb_start = !inst_in_buffer_branch_jmp;
 					imem_apb_fetch_address = (jmp_i || branch_i)  ? jmp_target_i : pc_next;
 				end else begin
+					imem_apb_start = 1'b1;
 					imem_apb_fetch_address = branch_alternative;
 				end
 			end else begin
+				imem_apb_start = ready_i && !inst_in_buffer_branch_jmp;
 				imem_apb_fetch_address = pc_next;
 			end
 		end
@@ -306,7 +315,7 @@ always_comb begin
 			imem_apb_fetch_address = pc_current;
 		end
 		default: begin // ST_FETCH / ST_FETCH_SPEC
-			valid_o = imem_apb_valid;
+			valid_o = imem_apb_valid && !jmp_i;
 			inst_o = imem_apb_rdata;
 			pc_o = pc_current;
 			imem_apb_start = 1'b0;

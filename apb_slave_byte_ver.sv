@@ -3,7 +3,8 @@ module apb_slave_byte # (
 	SIZE = 64,
 	INIT_FILENAME = "",
 	SET_INDEX = 1'b0,
-	POSSIBLE_WAITS = 1'b0
+	POSSIBLE_WAITS = 1'b0,
+	OFFSET = 32'b0
 ) (
 	input logic clk,
 	input logic rst_n,
@@ -16,12 +17,15 @@ int wait_counter;
 logic [7:0] mem [SIZE * 4 - 1:0];
 assign mem_o = mem;
 
+logic [31:0] addr_offset;
+assign addr_offset = apb.addr - OFFSET;
+
 initial begin
 	if (INIT_FILENAME != "") begin
 		$readmemh(INIT_FILENAME, mem);
 	end 
 end 
-assign apb.rdata = (apb.sel && apb.enable && (apb.write == 1'b0) && (wait_counter == 0)) ? { mem[apb.addr + 3], mem[apb.addr + 2], mem[apb.addr + 1], mem[apb.addr] } :  32'bx;
+assign apb.rdata = (apb.sel && apb.enable && (apb.write == 1'b0) && (wait_counter == 0)) ? { mem[addr_offset + 3], mem[addr_offset + 2], mem[addr_offset + 1], mem[addr_offset] } :  32'bx;
 assign apb.ready = (apb.sel && apb.enable && (wait_counter == 0));
 assign apb.slverr = 1'b0;
 
@@ -54,10 +58,10 @@ always_ff @(posedge clk or negedge rst_n) begin
 		end
 	end else begin
 		if (apb.sel && apb.enable && apb.write && (wait_counter == 0)) begin
-			if ( apb.strb[0] ) mem[apb.addr]     <= apb.wdata[7:0];
-			if ( apb.strb[1] ) mem[apb.addr + 1] <= apb.wdata[15:8];
-			if ( apb.strb[2] ) mem[apb.addr + 2] <= apb.wdata[23:16];
-			if ( apb.strb[3] ) mem[apb.addr + 3] <= apb.wdata[31:24];
+			if ( apb.strb[0] ) mem[addr_offset]     <= apb.wdata[7:0];
+			if ( apb.strb[1] ) mem[addr_offset + 1] <= apb.wdata[15:8];
+			if ( apb.strb[2] ) mem[addr_offset + 2] <= apb.wdata[23:16];
+			if ( apb.strb[3] ) mem[addr_offset + 3] <= apb.wdata[31:24];
 		end
 	end
 end
