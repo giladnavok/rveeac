@@ -53,17 +53,17 @@ int test() {
 		
 	
 
-const char* global = "global\n";
+char* non_const_global = "non const global\n";
 int main() {
-	printf("Hmm...\n");
+	char local[] = "local\n";
+	printf("const string\n");
+	printf(non_const_global);
+	printf(local);
 	printf("Number: %d\n", 5);
 	char *s = malloc(32);
-	strcpy(s, global);
-	printf(s);
-	while (1) {};
+	strcpy(s, "heap\n");
 	printf(s);
 	test();
-	
 	while (1) {};
 }
 

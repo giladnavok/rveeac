@@ -178,7 +178,7 @@ end
 // Sample jmp signal
 
 always_ff @(posedge clk or negedge rst_n) begin
-	if (!rst_n || state_e == ST_ISSUE_SECOND) begin
+	if (!rst_n || state_e != ST_ISSUE_FIRST) begin
 		signaled_jmp <= 1'b0;
 	end else if (signal_jmp) begin
 		signaled_jmp <= 1'b1;
