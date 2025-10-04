@@ -47,10 +47,14 @@ logic first_cycle;
 logic reg32_used_in_first_cycle;
 
 logic stall_one_cycle;
-logic store_load_stall;
+logic store_load_hazard;
 logic full_read_after_write;
 logic half_read_after_write;
+logic trigger_stall_when_ready;
+logic fetch_stall_for_jmp_target_cond;
 logic issue;
+
+logic signal_jmp;
 
 // Decode 
 opcode_e opcode;
@@ -82,6 +86,7 @@ logic ready_i_d;
 logic valid_i_d;
 logic stall_one_cycle_d;
 logic state_e_d;
+logic signaled_jmp;
 
 
 
@@ -153,6 +158,8 @@ always_ff @(posedge clk or negedge rst_n) begin
 	end
 end
 
+
+
 // Sample delayed signals
 always_ff @(posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
@@ -167,6 +174,17 @@ always_ff @(posedge clk or negedge rst_n) begin
 		rs32_d <= rs32_o;
 	end
 end
+
+// Sample jmp signal
+
+always_ff @(posedge clk or negedge rst_n) begin
+	if (!rst_n || state_e == ST_ISSUE_SECOND) begin
+		signaled_jmp <= 1'b0;
+	end else if (signal_jmp) begin
+		signaled_jmp <= 1'b1;
+	end
+end
+
 
 // Output Sequential //
 // ----------------- //
@@ -247,11 +265,10 @@ assign reg32_used_in_first_cycle =
 	cs.dec.en.jmp ||
 	cs.dec.en.branch
 ;
-assign store_load_stall = 
+assign store_load_hazard = 
 	( 
 		cs.dec.en.dmem_load_bypass && 
 		cs_exe_o.en.dmem_store &&
-		ready_i &&
 		!exe_dmem_apb_ready_d_i
 	);
 
@@ -259,7 +276,6 @@ assign full_read_after_write =
 	((rd_o != 5'b0) && 
 		(
 			(rd_o == rs1) && 
-			ready_i && 
 			cs_exe_o.en.rf_write && 
 			reg32_used_in_first_cycle
 		)
@@ -269,17 +285,27 @@ assign half_read_after_write =
 	((rd_o != 5'b0) && 
 		(
 			(rd_o == rs2) && 
-			ready_i && 
 			cs.dec.en.alu_b && 
 			(cs_exe_o.en.wb_order_flip != (cs.dec.sel.ser_start == SER_START_UH))
 		)
 	);
+
+
+assign trigger_stall_when_ready =
+	(store_load_hazard ||
+	full_read_after_write ||
+	half_read_after_write);
 		
 assign stall_one_cycle = 
-	(store_load_stall ||
-	full_read_after_write ||
-	half_read_after_write)
-	&& !stall_one_cycle_d && valid_o;
+	trigger_stall_when_ready
+	&& ready_i && !stall_one_cycle_d && valid_o;
+
+
+// Jump Logic //
+// ---------- //
+
+assign signal_jmp = fetch_stall_for_jmp_target_o ? 
+					1'b0 : cs.dec.en.jmp;
 
 // Decode Logic //
 // ------------ //
@@ -295,21 +321,20 @@ assign rs2 = inst[24:20];
 // --------------------- //
 assign first_cycle = (state_e == ST_ISSUE_FIRST);
 assign issue = (((state_e == ST_ISSUE_FIRST) && ready_i && !stall_one_cycle) || (state_e ==  ST_ISSUE_SECOND)) && !misspredict_i;
+assign jmp_o = signaled_jmp ? 1'b0 : ((state_e == ST_ISSUE_FIRST) && signal_jmp);
 always_comb begin
 	inst31_o = inst[31];
 	valid_o = 1'b0;
 	ready_o = 1'b0;
-	jmp_o = 1'b0;
 	branch_o = 1'b0;
 	jmp_target_o = '0;
 	lsu_load_addr_bypass_o = '0;
 	dmem_load_bypass_o = 1'b0;
-	rs32_o = rs32_d;
-	fetch_stall_for_jmp_target_o = stall_one_cycle && full_read_after_write && cs.dec.en.jmp;
+	rs32_o = cs.dec.en.reg32_use ? ((cs.dec.en.lsu_addr || cs.dec.en.dmem_load_bypass || cs.dec.en.jmp) ? rs1 : rs2) : rs32_d;
+	fetch_stall_for_jmp_target_o = cs.dec.en.jmp && full_read_after_write && !issue;
 	case (state_e)
 		ST_ISSUE_FIRST: begin
-			if (ready_i || !stall_one_cycle || misspredict_i) begin
-				jmp_o = cs.dec.en.jmp;
+			if (ready_i || !stall_one_cycle || !fetch_stall_for_jmp_target_o) begin
 				branch_o = cs.dec.en.branch;
 				jmp_target_o = (cs.dec.en.jmp || cs.dec.en.branch) ? add_out : '0;
 			end
@@ -321,13 +346,11 @@ always_comb begin
 						valid_o = 1'b1;
 						dmem_load_bypass_o = cs.dec.en.dmem_load_bypass;
 						lsu_load_addr_bypass_o = cs.dec.en.dmem_load_bypass ? add_out : '0;
-						rs32_o = cs.dec.en.reg32_use ? ((cs.dec.en.lsu_addr || cs.dec.en.dmem_load_bypass || cs.dec.en.jmp) ? rs1 : rs2) : rs32_d;
 					end
 				end else begin
 					valid_o = 1'b1;
 				end
 			end else begin
-				rs32_o = cs_exe_o.en.dmem_store ? rs2 : rs32_o;
 				valid_o = 1'b1;
 			end
 		end
