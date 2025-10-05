@@ -1,21 +1,13 @@
 
 FILENAME=$1
 
-
 CROSS=riscv32-unknown-elf
-$CROSS-gcc -c -march=rv32i -mabi=ilp32 -ffreestanding -Os -g crt0.S   -o crt0.o
-$CROSS-gcc -c -march=rv32i -mabi=ilp32 -ffreestanding -Os -g "$FILENAME" -o "${FILENAME%.c}.o"
 
 $CROSS-gcc -march=rv32i -mabi=ilp32 -ffreestanding \
   -nostartfiles -ffunction-sections -fdata-sections \
   -Wl,-T,linker.ld -Wl,--gc-sections -Wl,-Map=hello.map \
   -specs=nano.specs \
-  crt0.o simple.o -o hello.elf -lgcc -lc
-
-#$CROSS-gcc -march=rv32i -mabi=ilp32 -mcmodel=medlow -Os \
-#  -ffunction-sections -fdata-sections \
-#  -Wl,-T,linker.ld -Wl,--gc-sections -Wl,-Map=hello.map \
-#  simple.o -o hello.elf -lgcc -lc
+  crt0.S syscalls.c $FILENAME -o hello.elf -lgcc -lc
 
 riscv64-unknown-elf-objcopy -O binary \
   --only-section .init --only-section .text \

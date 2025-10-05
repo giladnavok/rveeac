@@ -1,6 +1,6 @@
 import typedefs::*;
 
-module tb_core_test_prog (
+module tb_core_c_program (
 );
 
 localparam IMEM_SIZE = 1 << 17;
@@ -98,8 +98,6 @@ end
 always begin
 	#4 if ((imem_apb.rdata == 32'h0000006f)) begin
 		# 32;
-
-		$display ("%d\n", mem[registers[8] - 20]);
 		$stop;
 	end
 		

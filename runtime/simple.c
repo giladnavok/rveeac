@@ -4,7 +4,6 @@
 #include <reent.h>
 #include <stdlib.h>
 #include <string.h>
-#include "syscalls.c"
 
 const int A[] = {1, 2, 3, 4};
 int B[] = {1, 2, 3, 4};
