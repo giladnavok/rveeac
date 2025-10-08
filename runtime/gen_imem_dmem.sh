@@ -3,11 +3,11 @@ FILENAME=$1
 
 CROSS=riscv32-unknown-elf
 
-$CROSS-gcc -march=rv32i -mabi=ilp32 -ffreestanding \
+$CROSS-gcc -march=rv32i_zicsr -mabi=ilp32 -ffreestanding \
   -nostartfiles -ffunction-sections -fdata-sections \
   -Wl,-T,linker.ld -Wl,--gc-sections -Wl,-Map=hello.map \
   -specs=nano.specs \
-  crt0.S syscalls.c $FILENAME -o hello.elf -lgcc -lc
+  csr.S crt0.S syscalls.c $FILENAME -o hello.elf -lgcc -lc
 
 riscv64-unknown-elf-objcopy -O binary \
   --only-section .init --only-section .text \

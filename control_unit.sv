@@ -308,9 +308,14 @@ always_comb begin
 			cs_o.exe.en.csr_req = ENABLE;
 
 			case (funct3_accel_e'(funct3_i))
-				FNC3_CSRRW: begin
+				FNC3_CSRRW, FNC3_CSRRWI: begin
+					cs_o.exe.sel.alu_op = ALU_OP_ADD;
 				end
-				FNC3_CSRRWI: begin
+				FNC3_CSRRS, FNC3_CSRRSI: begin
+					cs_o.exe.sel.alu_op = ALU_OP_ADD;
+				end
+				FNC3_CSRRC, FNC3_CSRRCI: begin
+					cs_o.exe.sel.alu_op = ALU_OP_ADD;
 				end
 			endcase
 		end

@@ -88,10 +88,10 @@ logic accel_done;
 // CSR
 logic csr_write;
 logic csr_h_sel;
-logic [CSR_ADDR_LEN-1:0] csr_addr;
-logic [HALF_XLEN-1:0] csr_write_data;
+logic [11:0] csr_addr;
+logic [15:0] csr_write_data;
 logic csr_valid;
-logic [HALF_XLEN-1:0] csr_read_data_out;
+logic [15:0] csr_read_data_out;
 
 // ===============================
 //			Internal Registers        
