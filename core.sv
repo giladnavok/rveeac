@@ -30,6 +30,8 @@ cs_exe_s dec_cs_exe_out;
 logic [31:0] dec_jmp_target_out;
 logic [31:0] dec_lsu_store_addr_out;
 logic [15:0] dec_alu_b_out;
+logic [11:0] dec_csr_addr_out;
+logic [15:0] dec_csr_imm_bypass_out;
 logic [15:0] dec_wb_data_out;
 logic [4:0] dec_rd_out;
 logic [4:0] dec_rs32_out;
@@ -117,6 +119,8 @@ decode_unit decode (
 	.lsu_load_addr_bypass_o(dec_lsu_load_addr_bypass),
 	.jmp_target_o(dec_jmp_target_out),
 	.alu_b_o(dec_alu_b_out),
+	.csr_addr_o(dec_csr_addr_out),
+	.csr_imm_bypass_o(dec_csr_imm_bypass_out),
 	.wb_o(dec_wb_data_out),
 	.rd_o(dec_rd_out),
 	.rs32_o(dec_rs32_out),
@@ -142,6 +146,8 @@ exe_mem_wb_stage exe_mem_wb (
 	.rd_i(dec_rd_out),
 	.rs32_i(dec_rs32_out),
 	.rs16_i(dec_rs16_out),
+	.csr_addr_i(dec_csr_addr_out),
+	.csr_imm_bypass_i(dec_csr_imm_bypass_out),
 
 	.ready_o(exe_ready),
 	.reg32_o(exe_reg32_out),

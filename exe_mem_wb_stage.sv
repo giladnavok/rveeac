@@ -27,6 +27,8 @@ module exe_mem_wb_stage #(
 	input logic [4:0] rd_i, 					///< Register file write port index
 	input logic [4:0] rs32_i, 					///< Register file 32 bit read port index
 	input logic [4:0] rs16_i, 					///< Register file 16 bit read port index
+	input logic [11:0] csr_addr_i, 				
+	input logic [15:0] csr_imm_bypass_i,
 
 	// --------- Output Controls --------
 	output logic ready_o, 						///< Execution stage ready for new controls and data
@@ -61,6 +63,8 @@ logic [31:0] lsu_addr;
 logic load_store_ready;
 
 // ALU
+logic [15:0] alu_a;
+logic [15:0] alu_b;
 logic [15:0] alu_out;
 
 // Regfile
@@ -80,6 +84,14 @@ logic [127:0] accel_data_in;
 logic [127:0] accel_data_out;
 logic accel_ready;
 logic accel_done;
+
+// CSR
+logic csr_write;
+logic csr_h_sel;
+logic [CSR_ADDR_LEN-1:0] csr_addr;
+logic [HALF_XLEN-1:0] csr_write_data;
+logic csr_valid;
+logic [HALF_XLEN-1:0] csr_read_data_out;
 
 // ===============================
 //			Internal Registers        
@@ -123,8 +135,8 @@ alu_sbm alu (
 	.op_i(cs_i.sel.alu_op),
 	.cmp_req_i(cs_i.en.cmp_req),
 	.cmp_flip_i(cs_i.en.cmp_flip),
-	.a_i(reg16_data),
-	.b_i(alu_b_i),
+	.a_i(alu_a),
+	.b_i(alu_b),
 	.result_o(alu_out),
 	.cmp_result_o(cmp_result_o),
 	.cmp_result_valid_o(cmp_result_valid_o),
@@ -170,6 +182,20 @@ aes128_core accel (
 	.done_o(accel_rf_write_en)
 );
 
+csr_sbm csr (
+    .clk(clk),
+    .rst_n(rst_n),
+	
+	.write_i(csr_write),
+	.h_sel_i(csr_h_sel),
+
+	.addr_i(csr_addr),
+	.write_data_i(csr_write_data),
+
+	.valid_o(csr_valid),
+	.read_data_o(csr_read_data_out)
+);
+
 // ===============================
 //			Internal Logic
 // ===============================
@@ -193,6 +219,31 @@ always_comb begin
 		WB_SEL_ALU: regfile_write_data = alu_out;
 		WB_SEL_LSU: regfile_write_data = lsu_out;
 		WB_SEL_WB: regfile_write_data = wb_i;
+		WB_SEL_CSR: regfile_write_data = csr_read_data_out;
+	endcase
+end
+
+// ALU A Mux
+always_comb begin
+	case (cs_i.sel.alu_a)
+		ALU_A_SEL_REG: alu_a = reg16_data;
+		ALU_A_SEL_CSR_IMM: alu_a = first_cycle ? csr_imm_bypass_i : 16'b0;
+	endcase
+end
+
+// ALU B Mux
+always_comb begin
+	case (cs_i.sel.alu_b)
+		ALU_B_SEL_DEC: alu_b = alu_b_i;
+		ALU_B_SEL_CSR: alu_b = csr_read_data_out;
+	endcase
+end
+
+// CSR Write Mux
+always_comb begin
+	case (cs_i.sel.csr_write)
+		CSR_W_SEL_REG: csr_write_data = reg16_data;
+		CSR_W_SEL_ALU: csr_write_data = alu_out;
 	endcase
 end
 
@@ -204,6 +255,11 @@ assign load_store_write = cs_i.en.dmem_store && !dmem_load_bypass_i;
 assign accel_load_key = cs_i.en.accel_load_key && valid_i && first_cycle;
 assign accel_start_enc = cs_i.en.accel_start_enc && valid_i && first_cycle;
 assign accel_start_dec = cs_i.en.accel_start_dec && valid_i && first_cycle;
+
+assign csr_write = valid_i && cs_i.en.csr_write;
+assign csr_h_sel = cs_i.en.csr_req && !first_cycle;
+assign csr_addr = csr_addr_i;
+
 
 always_comb begin
 	regfile_write_en = 1'b0;

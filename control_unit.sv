@@ -91,6 +91,7 @@ always_comb begin
 			cs_o.exe.sel.alu_op = ALU_OP_PLUS_4;
 			cs_o.exe.sel.wb = WB_SEL_ALU;
 			cs_o.exe.sel.wb_store_size = SIZE_W;
+			cs_o.exe.sel.alu_b = ALU_B_SEL_DEC;
 			// Enable //
 			cs_o.exe.en.rf_write = ENABLE;
 		end
@@ -113,6 +114,7 @@ always_comb begin
 			cs_o.exe.sel.alu_op = ALU_OP_PLUS_4;
 			cs_o.exe.sel.wb = WB_SEL_ALU;
 			cs_o.exe.sel.wb_store_size = SIZE_W;
+			cs_o.exe.sel.alu_b = ALU_B_SEL_DEC;
 			// Enable //
 			cs_o.exe.en.rf_write = ENABLE;
 		end
@@ -135,6 +137,8 @@ always_comb begin
 			// Sel //
 			cs_o.exe.en.cmp_req = ENABLE;
 			cs_o.exe.en.cmp_flip = funct3_i[0];
+			cs_o.exe.sel.alu_a = ALU_A_SEL_REG;
+			cs_o.exe.sel.alu_b = ALU_B_SEL_DEC;
 			// Enable //
 			cs_o.exe.en.reg16_use = ENABLE;
 
@@ -238,6 +242,8 @@ always_comb begin
 			// Sel //
 			cs_o.exe.sel.wb = WB_SEL_ALU;
 			cs_o.exe.sel.wb_store_size = SIZE_W;
+			cs_o.exe.sel.alu_a = ALU_A_SEL_REG;
+			cs_o.exe.sel.alu_b = ALU_B_SEL_DEC;
 			// Enable //
 			cs_o.exe.en.rf_write = ENABLE;
 			cs_o.exe.en.reg16_use = ENABLE;
@@ -276,6 +282,35 @@ always_comb begin
 					cs_o.exe.en.rs16_half_order_flip = ENABLE;
 					cs_o.exe.en.wb_order_flip = ENABLE;
 					cs_o.dec.en.forward_just_one_half = ENABLE;
+				end
+			endcase
+		end
+		OPC_SYSTEM: begin //!Continue
+			// Decode Stage //
+			// ------------ //
+			// Sel //
+			cs_o.dec.sel.inst_type = INST_TYPE_I;
+			cs_o.dec.sel.alu_wb_sel = ALU_WB_SEL_IMM;
+			// Enable //
+			cs_o.dec.en.csr_addr = ENABLE;
+			cs_o.dec.en.csr_imm_bypass = funct3_i[2];
+
+			// Execution Stage //
+			// --------------- //
+			// Sel //
+			cs_o.exe.sel.wb = WB_SEL_CSR;
+			cs_o.exe.sel.wb_store_size = SIZE_W;
+			cs_o.exe.sel.alu_a = funct3_i[2] ? ALU_A_SEL_CSR_IMM : ALU_A_SEL_REG;
+			cs_o.exe.sel.alu_b = ALU_B_SEL_CSR;
+			// Enable //
+			cs_o.exe.en.rf_write = ENABLE;
+			cs_o.exe.en.reg16_use = ENABLE;
+			cs_o.exe.en.csr_req = ENABLE;
+
+			case (funct3_accel_e'(funct3_i))
+				FNC3_CSRRW: begin
+				end
+				FNC3_CSRRWI: begin
 				end
 			endcase
 		end

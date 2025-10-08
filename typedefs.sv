@@ -2,6 +2,11 @@
 `define TYPEDEFS_SV
 
 package typedefs;
+
+	parameter int XLEN = 32;
+	parameter int HALF_XLEN = XLEN/2;
+	parameter int CSR_ADDR_LEN = 12;
+
 	typedef enum logic [2:0] {
 		INST_TYPE_R,
 		INST_TYPE_I,
@@ -21,7 +26,8 @@ package typedefs;
 	typedef enum logic [2:0] {
 		WB_SEL_ALU,
 		WB_SEL_LSU,
-		WB_SEL_WB
+		WB_SEL_WB,
+		WB_SEL_CSR
 	} cs_wb_sel;
 
 	typedef enum logic [1:0] {
@@ -79,10 +85,19 @@ package typedefs;
 	} cs_alu_wb_sel;
 
 	typedef enum logic [2:0] {
-		CMP_OUT_SEL_EQ,
-		CMP_OUT_SEL_LT,
-		CMP_OUT_SEL_LTU
+		ALU_A_SEL_REG,
+		ALU_A_SEL_CSR_IMM
+	} cs_alu_a_sel;
+
+	typedef enum logic [2:0] {
+		ALU_B_SEL_DEC,
+		ALU_B_SEL_CSR
 	} cs_alu_b_sel;
+
+	typedef enum logic [2:0] {
+		CSR_W_SEL_REG,
+		CSR_W_SEL_ALU
+	} cs_csr_w_sel;
 
 	typedef enum logic {
 		SER_START_LH = 1'b0,
@@ -119,6 +134,8 @@ package typedefs;
 		logic jmp;
 		logic branch;
 		logic forward_just_one_half;
+		logic csr_addr;
+		logic csr_imm_bypass;
 	} cs_dec_en_s;
 
 	typedef struct packed {
@@ -128,6 +145,9 @@ package typedefs;
 
 	typedef struct packed {
 		cs_alu_op alu_op;
+		cs_alu_a_sel alu_a;
+		cs_alu_b_sel alu_b;
+		cs_csr_w_sel csr_write;
 		cs_wb_sel wb;
 		cs_size wb_store_size;
 		cs_ext wb_ext;
@@ -144,6 +164,8 @@ package typedefs;
 		logic accel_start_enc;
 		logic accel_start_dec;
 		logic accel_load_key;
+		logic csr_write;
+		logic csr_req;
 	} cs_exe_en_s;
 
 	typedef struct packed {
@@ -216,6 +238,15 @@ package typedefs;
 		FNC3_ST_DEC = 3'b010
 	} funct3_accel_e;
 
+	typedef enum logic [2:0] {
+		FNC3_CSRRW = 3'b001,
+		FNC3_CSRRS = 3'b010,
+		FNC3_CSRRC = 3'b011,
+		FNC3_CSRRWI = 3'b101,
+		FNC3_CSRRSI = 3'b110,
+		FNC3_CSRRCI = 3'b111
+	} funct3_csr_e;
+
 //	typedef enum logic [2:0] {
 //		FNC3_JALR = 3'b000,
 //		FNC3_FENCE = 3'b000,
@@ -238,7 +269,9 @@ package typedefs;
 			dmem_load_bypass: DISABLE,
 			jmp: DISABLE,
 			branch: DISABLE,
-			forward_just_one_half: DISABLE
+			forward_just_one_half: DISABLE,
+			csr_addr: DISABLE,
+			csr_imm_bypass: DISABLE
 		};
 	parameter cs_exe_en_s 
 	CS_EXE_EN_DEFAULT = '{
@@ -251,7 +284,9 @@ package typedefs;
 			rs16_half_order_flip: DISABLE,
 			accel_start_enc: DISABLE,
 			accel_start_dec: DISABLE,
-			accel_load_key: DISABLE
+			accel_load_key: DISABLE,
+			csr_write: DISABLE,
+			csr_req: DISABLE
 		};
 endpackage
 
