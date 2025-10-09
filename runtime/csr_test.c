@@ -5,10 +5,12 @@
 
 
 void test1();
+void test2();
 		
 int main() {
-	test1();
+	test2();
 }
+
 void test1() {
 	for (int i = 2; i < 9999999; i*=2) {
 		printf("%d: ", i-1);
@@ -22,3 +24,19 @@ void test1() {
 	printf("Done\n");
 }
 
+void test2() {
+	uint32_t t = 0;
+	for (int i = 1; i < 9999999; i*=2) {
+		printf("%d: ", i);
+		uint32_t read = read_set_mscratch(i);
+		printf("Read: %d, %d\n", read, t);
+		if (t != read) {
+			printf("F\n");
+			return;
+		} else {
+			printf ("S\n");
+		}
+		t |= i;
+	}
+	printf("Done2\n");
+}

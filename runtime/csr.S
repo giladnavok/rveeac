@@ -11,3 +11,8 @@ read_mscratch:
 read_write_mscratch:
 	csrrw a0, mscratch, a0
 	ret
+
+.global read_set_mscratch
+read_set_mscratch:
+	csrrs a0, mscratch, a0
+	ret
