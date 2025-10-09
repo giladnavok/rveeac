@@ -3,19 +3,22 @@
 #include "csr.h"
 #include "syscalls.h"
 
-void myPrintf(int n) {
-	char buf[1];
-	while (n > 0) {
-		buf[0] = (n % 10) + '0';
-		_write(1, buf, 1);
-		n /= 10;
-	}
-	_write(1, "\n", 1);
-}
+
+void test1();
 		
 int main() {
-	for (int i = 0; i < 1000; i++) {
-		printf("%d\n", 12312312);
+	test1();
+}
+void test1() {
+	for (int i = 2; i < 9999999; i*=2) {
+		printf("%d: ", i-1);
+		if ((i/2)-1 != read_write_mscratch(i-1)) {
+			printf("F\n");
+			return;
+		} else {
+			printf ("S\n");
+		}
 	}
+	printf("Done\n");
 }
 

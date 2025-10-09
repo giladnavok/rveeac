@@ -306,6 +306,7 @@ always_comb begin
 			cs_o.exe.en.rf_write = ENABLE;
 			cs_o.exe.en.reg16_use = ENABLE;
 			cs_o.exe.en.csr_req = ENABLE;
+			cs_o.exe.en.csr_write = ENABLE;
 
 			case (funct3_accel_e'(funct3_i))
 				FNC3_CSRRW, FNC3_CSRRWI: begin
