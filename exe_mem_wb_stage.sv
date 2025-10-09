@@ -66,6 +66,7 @@ logic load_store_ready;
 logic [15:0] alu_a;
 logic [15:0] alu_b;
 logic [15:0] alu_out;
+logic alu_cmp_result_valid;
 
 // Regfile
 logic [31:0] reg32_data;
@@ -92,6 +93,9 @@ logic [11:0] csr_addr;
 logic [15:0] csr_write_data;
 logic csr_valid;
 logic [15:0] csr_read_data_out;
+
+// Misc
+logic first_two_cycles;
 
 // ===============================
 //			Internal Registers        
@@ -139,7 +143,7 @@ alu_sbm alu (
 	.b_i(alu_b),
 	.result_o(alu_out),
 	.cmp_result_o(cmp_result_o),
-	.cmp_result_valid_o(cmp_result_valid_o),
+	.cmp_result_valid_o(alu_cmp_result_valid),
 	.shift_bigger_then_16_o(shift_bigger_then_16_o)
 );
 
@@ -260,6 +264,8 @@ assign csr_write = valid_i && cs_i.en.csr_write;
 assign csr_h_sel = cs_i.en.csr_req && !first_cycle;
 assign csr_addr = csr_addr_i;
 
+assign first_two_cycles = first_cycle || first_cycle_d;
+
 
 always_comb begin
 	regfile_write_en = 1'b0;
@@ -269,13 +275,14 @@ always_comb begin
 			regfile_write_en = load_store_valid;
 			rd_h_sel = load_store_half;
 		end else begin
-			regfile_write_en = first_cycle || first_cycle_d;
+			regfile_write_en = first_two_cycles;
 			rd_h_sel = !first_cycle ^ cs_i.en.wb_order_flip; 
 		end
 	end
 end
 
-assign ready_o = cmp_result_valid_o || (accel_ready && load_store_ready && !first_cycle);
+assign cmp_result_valid_o = alu_cmp_result_valid && first_two_cycles;
+assign ready_o = alu_cmp_result_valid || (accel_ready && load_store_ready && !first_cycle);
 assign reg32_o = reg32_data;
 
 endmodule
