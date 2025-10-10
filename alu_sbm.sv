@@ -287,6 +287,12 @@ always_comb begin
 				end
 			end
 		end
+		ALU_OP_CLR: begin
+			not_in = a_i;
+			and_a = not_out;
+			and_b = b_i;
+			result_o = and_out;
+		end
 	endcase
 end
 

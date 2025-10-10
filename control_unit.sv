@@ -309,16 +309,19 @@ always_comb begin
 			cs_o.exe.en.csr_write = ENABLE;
 
 			case (funct3_accel_e'(funct3_i))
-				FNC3_CSRRW, FNC3_CSRRWI: begin
-					cs_o.exe.sel.alu_op = ALU_OP_ADD;
+				FNC3_CSRRW: begin
 					cs_o.exe.sel.csr_write = CSR_W_SEL_REG;
+				end
+				FNC3_CSRRWI: begin
+					cs_o.exe.sel.csr_write = CSR_W_SEL_IMM;
 				end
 				FNC3_CSRRS, FNC3_CSRRSI: begin
 					cs_o.exe.sel.alu_op = ALU_OP_OR;
 					cs_o.exe.sel.csr_write = CSR_W_SEL_ALU;
 				end
 				FNC3_CSRRC, FNC3_CSRRCI: begin
-					cs_o.exe.sel.alu_op = ALU_OP_ADD;
+					cs_o.exe.sel.alu_op = ALU_OP_CLR;
+					cs_o.exe.sel.csr_write = CSR_W_SEL_ALU;
 				end
 			endcase
 		end

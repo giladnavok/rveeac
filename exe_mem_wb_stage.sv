@@ -28,7 +28,6 @@ module exe_mem_wb_stage #(
 	input logic [4:0] rs32_i, 					///< Register file 32 bit read port index
 	input logic [4:0] rs16_i, 					///< Register file 16 bit read port index
 	input logic [11:0] csr_addr_i, 				
-	input logic [15:0] csr_imm_bypass_i,
 
 	// --------- Output Controls --------
 	output logic ready_o, 						///< Execution stage ready for new controls and data
@@ -93,6 +92,8 @@ logic [11:0] csr_addr;
 logic [15:0] csr_write_data;
 logic csr_valid;
 logic [15:0] csr_read_data_out;
+
+logic [15:0] csr_imm_ext;
 
 // Misc
 logic first_two_cycles;
@@ -217,6 +218,9 @@ always_ff @(posedge clk or negedge rst_n) begin
 	end
 end
 
+// CSR Imm extender
+assign csr_imm_ext = first_cycle ? {11'b0, rs16_i} : 16'b0;
+
 // Regfile WB data mux
 always_comb begin
 	case (cs_i.sel.wb)
@@ -231,7 +235,7 @@ end
 always_comb begin
 	case (cs_i.sel.alu_a)
 		ALU_A_SEL_REG: alu_a = reg16_data;
-		ALU_A_SEL_CSR_IMM: alu_a = first_cycle ? csr_imm_bypass_i : 16'b0;
+		ALU_A_SEL_CSR_IMM: alu_a = csr_imm_ext;
 	endcase
 end
 
@@ -248,6 +252,7 @@ always_comb begin
 	case (cs_i.sel.csr_write)
 		CSR_W_SEL_REG: csr_write_data = reg16_data;
 		CSR_W_SEL_ALU: csr_write_data = alu_out;
+		CSR_W_SEL_IMM: csr_write_data = csr_imm_ext;
 	endcase
 end
 

@@ -74,7 +74,8 @@ package typedefs;
 		ALU_OP_EQ,
 		ALU_OP_LT,
 		ALU_OP_LTU,
-		ALU_OP_PLUS_4
+		ALU_OP_PLUS_4,
+		ALU_OP_CLR
 	} cs_alu_op;
 
 	typedef enum logic [1:0] {
@@ -96,7 +97,8 @@ package typedefs;
 
 	typedef enum logic [2:0] {
 		CSR_W_SEL_REG,
-		CSR_W_SEL_ALU
+		CSR_W_SEL_ALU,
+		CSR_W_SEL_IMM
 	} cs_csr_w_sel;
 
 	typedef enum logic {

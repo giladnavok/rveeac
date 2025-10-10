@@ -38,8 +38,7 @@ module decode_unit (
 	output logic [4:0] rs16_o, 					///< Register file 16 bit read port index.
 	output logic inst31_o, 					///< Register file 16 bit read port index.
 
-	output logic [11:0] csr_addr_o,
-	output logic [15:0] csr_imm_bypass_o
+	output logic [11:0] csr_addr_o
 );
 
 // ===============================
@@ -336,7 +335,6 @@ always_comb begin
 	jmp_target_o = '0;
 	lsu_load_addr_bypass_o = '0;
 	dmem_load_bypass_o = 1'b0;
-	csr_imm_bypass_o = 16'hxxxx;
 	rs32_o = cs.dec.en.reg32_use ? ((cs.dec.en.lsu_addr || cs.dec.en.dmem_load_bypass || cs.dec.en.jmp) ? rs1 : rs2) : rs32_d;
 	fetch_stall_for_jmp_target_o = cs.dec.en.jmp && full_read_after_write && !issue;
 	case (state_e)
@@ -368,9 +366,6 @@ always_comb begin
 				rs32_o = cs.exe.en.dmem_store ? rs2 : rs32_o;
 				valid_o = 1'b1;
 				ready_o = 1'b1;
-				if (cs.dec.en.csr_imm_bypass) begin
-					csr_imm_bypass_o = {11'b0, rs1};
-				end
 			end
 		end
 		ST_WAIT_FETCH: begin
