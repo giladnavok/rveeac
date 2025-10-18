@@ -107,6 +107,7 @@ logic [31:0] csr_mepc;
 logic [31:0] csr_mip;
 logic [31:0] csr_mie;
 logic [31:0] csr_mtvec;
+logic csr_mstatus_mie;
 
 // Interrupt
 
@@ -236,6 +237,7 @@ csr_sbm csr (
 	.valid_o(csr_valid),
 	.read_data_o(csr_read_data_out), //! Continue connecting and check if dec changes harm
 
+	.mstatus_mie_o(csr_mstatus_mie),
 	.mepc_o(csr_mepc),
 	.mie_o(csr_mie),
 	.mip_o(csr_mip),
@@ -256,6 +258,7 @@ interrupt_sbm interrupt (
 	.mip_i(csr_mip),
 	.mie_i(csr_mie),
 	.mtvec_i(csr_mtvec),
+	.mstatus_mie_i(csr_mstatus_mie),
 
 	.mepc_write_o(int_mepc_write),
 	.mepc_write_data_o(int_mepc_write_data),

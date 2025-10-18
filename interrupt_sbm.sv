@@ -15,6 +15,7 @@ module interrupt_sbm (
 	input logic [31:0] mip_i,
 	input logic [31:0] mie_i,
 	input logic [31:0] mtvec_i,
+	input logic mstatus_mie_i,
 
 	output logic mepc_write_o,
 	output logic [31:0] mepc_write_data_o,
@@ -79,7 +80,9 @@ always_comb begin
 		end
 	end
 
-	interrupt_o = dec_ready_for_interrupt_i ? interrupt : 1'b0;
+	interrupt_o = mstatus_mie_i ? 
+		(dec_ready_for_interrupt_i ? interrupt : 1'b0 ) :
+	   	1'b0;
 	interrupt_jmp_target_o = interrupt_o ? mtvec_i : 32'b0;
 end
 

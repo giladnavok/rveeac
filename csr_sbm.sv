@@ -22,6 +22,7 @@ module csr_sbm (
 	output logic valid_o, /// <<< Used to prevent intermediary values to get sampled
 	output logic [HALF_XLEN-1:0] read_data_o,
 
+	output logic mstatus_mie_o,
 	output logic [XLEN-1:0] mepc_o,
 	output logic [XLEN-1:0] mie_o,
 	output logic [XLEN-1:0] mip_o,
@@ -35,10 +36,10 @@ localparam bit [31:0] WMASK_DEFAULT = '1;
 
 localparam bit [11:0] ADDR_MSTATUS = 12'h300;
 localparam bit [31:0] WMASK_MSTATUS = 32'h888, // Assign
-					  RESET_MSTATUS = (32'b11 << 11);
+					  RESET_MSTATUS = (32'b11 << 11) | (32'b1 << 3);
 
 localparam bit [11:0] ADDR_MIE = 12'h304;
-localparam logic [31:0] WMASK_MIE = '0, // Assign
+localparam logic [31:0] WMASK_MIE = '1, // Assign
 					  RESET_MIE = (32'b1 << 16) | (32'b1 << 11);
 
 localparam bit [11:0] ADDR_MTVEC = 12'h305;
@@ -87,6 +88,7 @@ logic mask_h_sel;
 
 assign mask_old_value = write_i ? read_data_o : '0;
 assign mask_new_value = write_i ? write_data_i : '0;
+assign mask_h_sel = h_sel_i;
 assign mask_half = mask_h_sel? mask[31:16] : mask[15:0];
 assign mask_o = (mask_old_value & ~mask_half) | (mask_new_value & mask_half);
 always_comb begin
@@ -169,6 +171,7 @@ assign mepc_o = mepc;
 assign mie_o = mie;
 assign mip_o = mip;
 assign mtvec_o = mtvec;
+assign mstatus_mie_o = mstatus[0][3];
 
 
 endmodule
