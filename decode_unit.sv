@@ -63,7 +63,7 @@ logic fetch_stall_for_jmp_target_cond;
 logic issue;
 
 logic signal_jmp_issue_first;
-logic signal_jmp_wait_fetch;
+logic signal_jmp_wait_fetch_or_interrupt;
 
 logic [31:0] jmp_target;
 
@@ -142,7 +142,7 @@ imm_gen_sbm imm_gen (
 // 	 				  otherwise switch to ST_WAIT_FETCH to wait for IF.
 // * ST_WAIT_FETCH: Wait for IF stage to finish fetching.
 
-enum logic [1:0] {ST_ISSUE_FIRST, ST_ISSUE_SECOND, ST_WAIT_FETCH} state_e;
+enum logic [1:0] {ST_ISSUE_FIRST, ST_ISSUE_SECOND, ST_WAIT_FETCH, ST_WAIT_INTERRUPT} state_e;
 
 localparam logic [31:0] NOP = 32'h00000013;
 always_ff @(posedge clk or negedge rst_n) begin
@@ -153,7 +153,9 @@ always_ff @(posedge clk or negedge rst_n) begin
 	end else begin
 		case (state_e)
 			ST_ISSUE_FIRST: begin
-				if (ready_i) begin
+				if (cs.dec.en.wait_for_interrupt) begin
+					state_e <= ST_WAIT_INTERRUPT;
+				end else if (ready_i) begin
 					state_e <= misspredict_i ? ST_WAIT_FETCH :
 						stall_one_cycle ? ST_ISSUE_FIRST : ST_ISSUE_SECOND;
 				end
@@ -169,6 +171,11 @@ always_ff @(posedge clk or negedge rst_n) begin
 					state_e <= ST_WAIT_FETCH;
 				end
 					
+			end
+			ST_WAIT_INTERRUPT: begin
+				if (interrupt_i) begin
+					state_e <= ST_WAIT_FETCH;
+				end
 			end
 		endcase
 	end
@@ -202,7 +209,7 @@ always_ff @(posedge clk or negedge rst_n) begin
 		case (state_e) 
 			ST_ISSUE_FIRST: signaled_jmp <= signal_jmp_issue_first;
 			ST_ISSUE_SECOND: signaled_jmp <= 1'b0;
-			ST_WAIT_FETCH: signaled_jmp <= !valid_i && signal_jmp_wait_fetch;
+			ST_WAIT_FETCH, ST_WAIT_INTERRUPT: signaled_jmp <= !valid_i && signal_jmp_wait_fetch_or_interrupt;
 		endcase
 	end
 end
@@ -332,8 +339,8 @@ assign signal_jmp_issue_first =
 	(state_e == ST_ISSUE_FIRST) && 
 	(interrupt_i || (fetch_stall_for_jmp_target_o ? 1'b0 : cs.dec.en.jmp));
 
-assign signal_jmp_wait_fetch = 
-	(state_e == ST_WAIT_FETCH) && 
+assign signal_jmp_wait_fetch_or_interrupt = 
+	(state_e inside {ST_WAIT_FETCH, ST_WAIT_INTERRUPT}) && 
 	(interrupt_i);
 
 always_comb begin
@@ -352,12 +359,11 @@ assign rd = inst[11:7];
 assign rs1 = inst[19:15];
 assign rs2 = inst[24:20];
 
-
 // Output Combinatorical //
 // --------------------- //
 assign first_cycle = (state_e == ST_ISSUE_FIRST);
-assign issue = (((state_e == ST_ISSUE_FIRST) && ready_i && !stall_one_cycle) || (state_e ==  ST_ISSUE_SECOND)) && !misspredict_i;
-assign jmp_o = signaled_jmp ? 1'b0 : (signal_jmp_issue_first || signal_jmp_wait_fetch);
+assign issue = (((state_e == ST_ISSUE_FIRST) && ready_i && !cs.dec.en.wait_for_interrupt && !stall_one_cycle) || (state_e ==  ST_ISSUE_SECOND)) && !misspredict_i;
+assign jmp_o = signaled_jmp ? 1'b0 : (signal_jmp_issue_first || signal_jmp_wait_fetch_or_interrupt);
 
 assign inst_jmp_or_branch_o = (opcode inside {OPC_BRANCH, OPC_JAL, OPC_JALR});
 assign ready_for_interrupt_o = (state_e != ST_ISSUE_SECOND);
@@ -411,6 +417,11 @@ always_comb begin
 		ST_WAIT_FETCH: begin
 			ready_o = 1'b1;
 			valid_o = (state_e_d != ST_WAIT_FETCH) && valid_o_d;
+			if (interrupt_i) begin
+				jmp_target_o = interrupt_jmp_target_i;
+			end
+		end
+		ST_WAIT_INTERRUPT: begin
 			if (interrupt_i) begin
 				jmp_target_o = interrupt_jmp_target_i;
 			end

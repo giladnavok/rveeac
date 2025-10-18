@@ -144,6 +144,7 @@ package typedefs;
 		logic forward_just_one_half;
 		logic csr_addr;
 		logic csr_imm_bypass;
+		logic wait_for_interrupt;
 	} cs_dec_en_s;
 
 	typedef struct packed {
@@ -261,7 +262,8 @@ package typedefs;
 	} funct3_system_e;
 
 	typedef enum logic [11:0] {
-		FNC12_MRET = 12'b001100000010
+		FNC12_MRET = 12'b001100000010,
+		FNC12_WFI = 12'b000100000101
 	} funct12_e;
 
 
@@ -289,7 +291,8 @@ package typedefs;
 			branch: DISABLE,
 			forward_just_one_half: DISABLE,
 			csr_addr: DISABLE,
-			csr_imm_bypass: DISABLE
+			csr_imm_bypass: DISABLE,
+			wait_for_interrupt: DISABLE
 		};
 	parameter cs_exe_en_s 
 	CS_EXE_EN_DEFAULT = '{

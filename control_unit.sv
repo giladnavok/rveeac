@@ -353,6 +353,17 @@ always_comb begin
 								// Enable //
 								cs_o.exe.en.csr_restore_mstatus_mie = ENABLE;
 							end
+							FNC12_WFI: begin
+								// Decode Stage //
+								// ------------ //
+								// Sel //
+								// Enable //
+								cs_o.dec.en.wait_for_interrupt = ENABLE;
+								// Execution Stage //
+								// --------------- //
+								// Sel //
+								// Enable //
+							end
 						endcase
 					end
 				endcase
