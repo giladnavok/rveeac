@@ -8,7 +8,9 @@ module core (
 	`ifdef DEBUG
 		output logic [15:0] registers_od [1:0][31:0],
 	`endif
-	apb_if.master dmem_apb
+	apb_if.master dmem_apb,
+
+	input logic interrupt_req_ext_i
 
 );
 
@@ -19,6 +21,7 @@ logic fetch_valid;
 logic [31:0] fetch_pc_out;
 logic [31:0] fetch_inst_out;
 logic fetch_misspredict;
+logic [31:0] fetch_pc_current;
 
 logic dec_ready;
 logic dec_valid;
@@ -37,6 +40,9 @@ logic [4:0] dec_rs32_out;
 logic [4:0] dec_rs16_out;
 logic dec_inst31_out;
 logic dec_stall_for_jmp_target;
+logic dec_inst_jmp_or_branch;
+logic dec_ready_for_interrupt;
+logic [31:0] dec_pc;
 
 logic exe_ready;
 logic exe_cmp_result_valid;
@@ -45,6 +51,10 @@ logic [31:0] exe_reg32_out;
 logic exe_first_cycle;
 logic exe_shift_bigger_then_16;
 logic exe_dmem_apb_ready_d;
+logic [31:0] exe_mepc;
+
+logic exe_interrupt;
+logic [31:0] exe_interrupt_jmp_target;
 
 //logic dec_flush;
 //logic [1:0] speculative_cycle_counter;
@@ -89,7 +99,8 @@ fetch_unit fetch (
 	.misspredict_o(fetch_misspredict),
 
 	.pc_o(fetch_pc_out),
-	.inst_o(fetch_inst_out)
+	.inst_o(fetch_inst_out),
+	.pc_current_o(fetch_pc_current)
 );
 
 decode_unit decode (
@@ -100,10 +111,13 @@ decode_unit decode (
 	.valid_i(fetch_valid),
 	.exe_dmem_apb_ready_d_i(exe_dmem_apb_ready_d),
 	.misspredict_i(fetch_misspredict),
+	.interrupt_i(exe_interrupt),
 
 	.inst_i(fetch_inst_out),
 	.pc_i(fetch_pc_out),
 	.reg32_i(exe_reg32_out),
+	.interrupt_jmp_target_i(exe_interrupt_jmp_target),
+	.mepc_i(exe_mepc),
 
 	.cs_exe_o(dec_cs_exe_out),
 	.jmp_o(dec_jmp),
@@ -113,6 +127,8 @@ decode_unit decode (
 	.dmem_load_bypass_o(dec_dmem_load_bypass),
 	.exe_first_cycle_o(exe_first_cycle),
 	.fetch_stall_for_jmp_target_o(dec_stall_for_jmp_target),
+	.inst_jmp_or_branch_o(dec_inst_jmp_or_branch),
+	.ready_for_interrupt_o(dec_ready_for_interrupt),
 
 	.lsu_store_addr_o(dec_lsu_store_addr_out),
 	.lsu_load_addr_bypass_o(dec_lsu_load_addr_bypass),
@@ -123,17 +139,21 @@ decode_unit decode (
 	.rd_o(dec_rd_out),
 	.rs32_o(dec_rs32_out),
 	.rs16_o(dec_rs16_out),
-	.inst31_o(dec_inst31_out)
+	.inst31_o(dec_inst31_out),
+	.pc_o(dec_pc)
 );
 
 exe_mem_wb_stage exe_mem_wb (
 	.clk(clk),
 	.rst_n(rst_n),
-	.first_cycle(exe_first_cycle),
 
+	.first_cycle(exe_first_cycle),
 	.valid_i(dec_valid),
 	.dmem_load_bypass_i(dec_dmem_load_bypass),
 	.cs_i(dec_cs_exe_out),
+
+	.interrupt_req_ext_i(interrupt_req_ext_i),
+	.dec_ready_for_interrupt_i(dec_ready_for_interrupt),
 
 	.dmem_apb(dmem_apb),
 
@@ -145,6 +165,9 @@ exe_mem_wb_stage exe_mem_wb (
 	.rs32_i(dec_rs32_out),
 	.rs16_i(dec_rs16_out),
 	.csr_addr_i(dec_csr_addr_out),
+	.fetch_pc_current_i(fetch_pc_current),
+	.dec_pc_i(dec_pc),
+	.dec_inst_jmp_or_branch_i(dec_inst_jmp_or_branch),
 
 	.ready_o(exe_ready),
 	.reg32_o(exe_reg32_out),
@@ -156,7 +179,10 @@ exe_mem_wb_stage exe_mem_wb (
 	`endif
 
 	.cmp_result_valid_o(exe_cmp_result_valid),
-	.dmem_apb_ready_d_o(exe_dmem_apb_ready_d)
+	.dmem_apb_ready_d_o(exe_dmem_apb_ready_d),
+	.interrupt_o(exe_interrupt),
+	.interrupt_jmp_target_o(exe_interrupt_jmp_target),
+	.mepc_o(exe_mepc)
 );
 endmodule
 

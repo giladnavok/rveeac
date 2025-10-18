@@ -11,6 +11,7 @@ localparam UART_ADDR = 32'h1000_0000;
 
 logic clk;
 logic rst_n;
+logic interrupt_req_ext;
 logic [31:0] inst;
 logic [31:0] inst_d;
 logic [15:0] registers_halfs [1:0][31:0];
@@ -70,7 +71,8 @@ core core_inst (
 	.rst_n(rst_n),
 	.imem_apb(imem_apb.master),
 	.dmem_apb(router_apb.master),
-	.registers_od(registers_halfs)
+	.registers_od(registers_halfs),
+	.interrupt_req_ext_i(interrupt_req_ext)
 );
 
 assign uart_apb.ready = 1'b1;
@@ -91,6 +93,7 @@ always #2 clk = ~clk;
 
 initial begin
 	rst_n = 1'b0;
+	interrupt_req_ext = 1'b0;
 	clk = 1'b0;
 	#1 rst_n = 1'b1;
 end
@@ -100,7 +103,12 @@ always begin
 		# 32;
 		$stop;
 	end
-		
+end
+
+always begin
+	#400000;
+	@(posedge clk) interrupt_req_ext = 1'b1;
+	@(posedge clk) interrupt_req_ext = 1'b0;
 end
 
 endmodule

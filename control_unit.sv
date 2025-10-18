@@ -13,12 +13,16 @@ module control_unit (
 	input logic [2:0] funct3_i,
 	input logic [6:0] funct7_i,
 
+	input logic [4:0] funct12_least_5_i,
+
 	input cs_exe_sel_s exe_sel_d_i,
 
 	// Output Controls //
 	// --------------- //
 	output cs_s cs_o
 );
+
+logic [11:0] funct12;
 
 cs_dec_sel_s dec_sel_d;
 always_ff @(posedge clk or negedge rst_n) begin
@@ -34,6 +38,7 @@ always_comb begin
 	cs_o.dec.en = CS_DEC_EN_DEFAULT;
 	cs_o.exe.sel = exe_sel_d_i;
 	cs_o.exe.en = CS_EXE_EN_DEFAULT;
+	funct12 = {funct7_i, funct12_least_5_i};
 
 	case (opcode_e'(opcode_i))
 		OPC_LUI: begin
@@ -81,6 +86,7 @@ always_comb begin
 			cs_o.dec.sel.add_sel = DEC_ADD_SEL_PC;
 			cs_o.dec.sel.alu_wb_sel = ALU_WB_SEL_PC;
 			cs_o.dec.sel.ser_start = SER_START_LH;
+			cs_o.dec.sel.jmp_target = JMP_TARGET_SEL_ADDER;
 			// Enable //
 			cs_o.dec.en.alu_b = ENABLE;
 			cs_o.dec.en.jmp = ENABLE;
@@ -103,6 +109,7 @@ always_comb begin
 			cs_o.dec.sel.add_sel = DEC_ADD_SEL_REG;
 			cs_o.dec.sel.alu_wb_sel = ALU_WB_SEL_PC;
 			cs_o.dec.sel.ser_start = SER_START_LH;
+			cs_o.dec.sel.jmp_target = JMP_TARGET_SEL_ADDER;
 			// Enable //
 			cs_o.dec.en.alu_b = ENABLE;
 			cs_o.dec.en.jmp = ENABLE;
@@ -127,6 +134,7 @@ always_comb begin
 			cs_o.dec.sel.alu_wb_sel = ALU_WB_SEL_REG;
 			cs_o.dec.sel.ser_start = SER_START_LH;
 			cs_o.dec.sel.add_sel = DEC_ADD_SEL_PC;
+			cs_o.dec.sel.jmp_target = JMP_TARGET_SEL_ADDER;
 			// Enable //
 			cs_o.dec.en.alu_b = ENABLE;
 			cs_o.dec.en.reg32_use = ENABLE;
@@ -286,44 +294,69 @@ always_comb begin
 			endcase
 		end
 		OPC_SYSTEM: begin //!Continue
-			// Decode Stage //
-			// ------------ //
-			// Sel //
-			cs_o.dec.sel.inst_type = INST_TYPE_I;
-			cs_o.dec.sel.alu_wb_sel = ALU_WB_SEL_IMM;
-			// Enable //
-			cs_o.dec.en.csr_addr = ENABLE;
-			cs_o.dec.en.csr_imm_bypass = funct3_i[2];
+			if (funct3_i inside {
+				FNC3_CSRRW, FNC3_CSRRWI,
+				FNC3_CSRRS, FNC3_CSRRSI,
+				FNC3_CSRRC, FNC3_CSRRCI }) begin // If CSR Instruction
+				// Decode Stage //
+				// ------------ //
+				// Sel //
+				cs_o.dec.sel.inst_type = INST_TYPE_I;
+				cs_o.dec.sel.alu_wb_sel = ALU_WB_SEL_IMM;
+				// Enable //
+				cs_o.dec.en.csr_addr = ENABLE;
+				cs_o.dec.en.csr_imm_bypass = funct3_i[2];
 
-			// Execution Stage //
-			// --------------- //
-			// Sel //
-			cs_o.exe.sel.wb = WB_SEL_CSR;
-			cs_o.exe.sel.wb_store_size = SIZE_W;
-			cs_o.exe.sel.alu_a = funct3_i[2] ? ALU_A_SEL_CSR_IMM : ALU_A_SEL_REG;
-			cs_o.exe.sel.alu_b = ALU_B_SEL_CSR;
-			// Enable //
-			cs_o.exe.en.rf_write = ENABLE;
-			cs_o.exe.en.reg16_use = ENABLE;
-			cs_o.exe.en.csr_req = ENABLE;
-			cs_o.exe.en.csr_write = ENABLE;
+				// Execution Stage //
+				// --------------- //
+				// Sel //
+				cs_o.exe.sel.wb = WB_SEL_CSR;
+				cs_o.exe.sel.wb_store_size = SIZE_W;
+				cs_o.exe.sel.alu_a = funct3_i[2] ? ALU_A_SEL_CSR_IMM : ALU_A_SEL_REG;
+				cs_o.exe.sel.alu_b = ALU_B_SEL_CSR;
+				// Enable //
+				cs_o.exe.en.rf_write = ENABLE;
+				cs_o.exe.en.reg16_use = ENABLE;
+				cs_o.exe.en.csr_req = ENABLE;
+				cs_o.exe.en.csr_write = ENABLE;
 
-			case (funct3_accel_e'(funct3_i))
-				FNC3_CSRRW: begin
-					cs_o.exe.sel.csr_write = CSR_W_SEL_REG;
-				end
-				FNC3_CSRRWI: begin
-					cs_o.exe.sel.csr_write = CSR_W_SEL_IMM;
-				end
-				FNC3_CSRRS, FNC3_CSRRSI: begin
-					cs_o.exe.sel.alu_op = ALU_OP_OR;
-					cs_o.exe.sel.csr_write = CSR_W_SEL_ALU;
-				end
-				FNC3_CSRRC, FNC3_CSRRCI: begin
-					cs_o.exe.sel.alu_op = ALU_OP_CLR;
-					cs_o.exe.sel.csr_write = CSR_W_SEL_ALU;
-				end
-			endcase
+				case (funct3_csr_e'(funct3_i))
+					FNC3_CSRRW: begin
+						cs_o.exe.sel.csr_write = CSR_W_SEL_REG;
+					end
+					FNC3_CSRRWI: begin
+						cs_o.exe.sel.csr_write = CSR_W_SEL_IMM;
+					end
+					FNC3_CSRRS, FNC3_CSRRSI: begin
+						cs_o.exe.sel.alu_op = ALU_OP_OR;
+						cs_o.exe.sel.csr_write = CSR_W_SEL_ALU;
+					end
+					FNC3_CSRRC, FNC3_CSRRCI: begin
+						cs_o.exe.sel.alu_op = ALU_OP_CLR;
+						cs_o.exe.sel.csr_write = CSR_W_SEL_ALU;
+					end
+				endcase
+			end else begin // If other system commands
+				case (funct3_system_e'(funct3_i))
+					FNC3_PRIV: begin
+						case (funct12_e'(funct12))
+							FNC12_MRET: begin
+								// Decode Stage //
+								// ------------ //
+								// Sel //
+								cs_o.dec.sel.jmp_target = JMP_TARGET_SEL_MEPC;
+								// Enable //
+								cs_o.dec.en.jmp = ENABLE;
+								// Execution Stage //
+								// --------------- //
+								// Sel //
+								// Enable //
+							end
+						endcase
+					end
+				endcase
+			end
+				
 		end
 		OPC_ACCEL: begin
 			// Decode Stage //

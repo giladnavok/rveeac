@@ -10,12 +10,15 @@ module decode_unit (
 	input logic valid_i, 						///< Input data from IF stage is valid
 	input logic exe_dmem_apb_ready_d_i, 				///<  !!!!
 	input logic misspredict_i, 				///<  !!!!
+	input logic interrupt_i, 				///<  !!!!
 	
 
 	// --------- Input Data  ------------
 	input logic [31:0] inst_i, 					///< Instruction from IF stage
 	input logic [31:0] pc_i, 					///< Instruction's PC from IF stage
 	input logic [31:0] reg32_i, 				///< 32 bit register port data.
+	input logic [31:0] interrupt_jmp_target_i, 				///<  !!!!
+	input logic [31:0] mepc_i, 				///<  !!!!
 
 	// --------- Output Controls --------
 	output cs_exe_s cs_exe_o, 					///< Control signals for execution stage
@@ -26,6 +29,8 @@ module decode_unit (
 	output logic dmem_load_bypass_o, 			///< Bypass to execution stage - start read transfer
 	output logic exe_first_cycle_o, 			///< First cycle signal for execution stage
 	output logic fetch_stall_for_jmp_target_o,
+	output logic inst_jmp_or_branch_o,
+	output logic ready_for_interrupt_o,
 
 	// --------- Output Data  -----------
 	output logic [31:0] lsu_store_addr_o, 		///< Store address for LSU - FF
@@ -38,7 +43,8 @@ module decode_unit (
 	output logic [4:0] rs16_o, 					///< Register file 16 bit read port index.
 	output logic inst31_o, 					///< Register file 16 bit read port index.
 
-	output logic [11:0] csr_addr_o
+	output logic [11:0] csr_addr_o,
+	output logic [31:0] pc_o
 );
 
 // ===============================
@@ -56,7 +62,10 @@ logic trigger_stall_when_ready;
 logic fetch_stall_for_jmp_target_cond;
 logic issue;
 
-logic signal_jmp;
+logic signal_jmp_issue_first;
+logic signal_jmp_wait_fetch;
+
+logic [31:0] jmp_target;
 
 // Decode 
 opcode_e opcode;
@@ -90,6 +99,8 @@ logic stall_one_cycle_d;
 logic state_e_d;
 logic signaled_jmp;
 
+logic valid_o_d;
+
 
 
 // ===============================
@@ -104,6 +115,9 @@ control_unit control (
 	.opcode_i(opcode),
 	.funct3_i(funct3),
 	.funct7_i(funct7),
+
+	.funct12_least_5_i(rs2),
+
 	.exe_sel_d_i(cs_exe_o.sel),
 
 	.cs_o(cs)
@@ -170,20 +184,26 @@ always_ff @(posedge clk or negedge rst_n) begin
 		ready_i_d <= 1'b0;
 		valid_i_d <= 1'b0;
 		rs32_d <= 5'b0;
+		valid_o_d <= 1'b0;
 	end else begin
 		state_e_d <= state_e;
 		stall_one_cycle_d <= stall_one_cycle;
 		rs32_d <= rs32_o;
+		valid_o_d <= valid_o;
 	end
 end
 
-// Sample jmp signal
+// Sample signaled_jmp
 
 always_ff @(posedge clk or negedge rst_n) begin
-	if (!rst_n || state_e != ST_ISSUE_FIRST) begin
+	if (!rst_n) begin
 		signaled_jmp <= 1'b0;
-	end else if (signal_jmp) begin
-		signaled_jmp <= 1'b1;
+	end else begin
+		case (state_e) 
+			ST_ISSUE_FIRST: signaled_jmp <= signal_jmp_issue_first;
+			ST_ISSUE_SECOND: signaled_jmp <= 1'b0;
+			ST_WAIT_FETCH: signaled_jmp <= !valid_i && signal_jmp_wait_fetch;
+		endcase
 	end
 end
 
@@ -305,12 +325,23 @@ assign stall_one_cycle =
 	trigger_stall_when_ready
 	&& ready_i && !stall_one_cycle_d && valid_o;
 
-
 // Jump Logic //
 // ---------- //
 
-assign signal_jmp = fetch_stall_for_jmp_target_o ? 
-					1'b0 : cs.dec.en.jmp;
+assign signal_jmp_issue_first = 
+	(state_e == ST_ISSUE_FIRST) && 
+	(interrupt_i || (fetch_stall_for_jmp_target_o ? 1'b0 : cs.dec.en.jmp));
+
+assign signal_jmp_wait_fetch = 
+	(state_e == ST_WAIT_FETCH) && 
+	(interrupt_i);
+
+always_comb begin
+	case (cs.dec.sel.jmp_target) 
+		JMP_TARGET_SEL_ADDER: jmp_target = add_out;
+		JMP_TARGET_SEL_MEPC: jmp_target = mepc_i;
+	endcase
+end
 
 // Decode Logic //
 // ------------ //
@@ -326,7 +357,11 @@ assign rs2 = inst[24:20];
 // --------------------- //
 assign first_cycle = (state_e == ST_ISSUE_FIRST);
 assign issue = (((state_e == ST_ISSUE_FIRST) && ready_i && !stall_one_cycle) || (state_e ==  ST_ISSUE_SECOND)) && !misspredict_i;
-assign jmp_o = signaled_jmp ? 1'b0 : ((state_e == ST_ISSUE_FIRST) && signal_jmp);
+assign jmp_o = signaled_jmp ? 1'b0 : (signal_jmp_issue_first || signal_jmp_wait_fetch);
+
+assign inst_jmp_or_branch_o = (opcode inside {OPC_BRANCH, OPC_JAL, OPC_JALR});
+assign ready_for_interrupt_o = (state_e != ST_ISSUE_SECOND);
+assign pc_o = pc;
 always_comb begin
 	inst31_o = inst[31];
 	valid_o = 1'b0;
@@ -339,38 +374,46 @@ always_comb begin
 	fetch_stall_for_jmp_target_o = cs.dec.en.jmp && full_read_after_write && !issue;
 	case (state_e)
 		ST_ISSUE_FIRST: begin
-			if (ready_i || !stall_one_cycle || !fetch_stall_for_jmp_target_o) begin
-				branch_o = cs.dec.en.branch;
-				jmp_target_o = (cs.dec.en.jmp || cs.dec.en.branch) ? add_out : '0;
-			end
-			if (ready_i) begin
-				if (!stall_one_cycle) begin
-					if (misspredict_i) begin
-						valid_o = 1'b0;
+			if (!(interrupt_i && inst_jmp_or_branch_o)) begin
+				if (ready_i || !stall_one_cycle || !fetch_stall_for_jmp_target_o) begin
+					branch_o = cs.dec.en.branch;
+					jmp_target_o = (cs.dec.en.jmp || cs.dec.en.branch) ? jmp_target : '0;
+				end
+				if (ready_i) begin
+					if (!stall_one_cycle) begin
+						if (misspredict_i) begin
+							valid_o = 1'b0;
+						end else begin
+							valid_o = 1'b1;
+							dmem_load_bypass_o = cs.dec.en.dmem_load_bypass;
+							lsu_load_addr_bypass_o = cs.dec.en.dmem_load_bypass ? jmp_target : '0;
+						end
 					end else begin
 						valid_o = 1'b1;
-						dmem_load_bypass_o = cs.dec.en.dmem_load_bypass;
-						lsu_load_addr_bypass_o = cs.dec.en.dmem_load_bypass ? add_out : '0;
 					end
 				end else begin
 					valid_o = 1'b1;
 				end
-			end else begin
-				valid_o = 1'b1;
+			end else begin 
+				valid_o = 1'b0;
+			end
+			if (interrupt_i) begin
+				jmp_target_o = interrupt_jmp_target_i;
 			end
 		end
 		ST_ISSUE_SECOND: begin
-			if (misspredict_i) begin
-				valid_o = 1'b0;
-			end else begin
+			valid_o = valid_o_d;
+			ready_o = 1'b1;
+			if (valid_o_d) begin
 				rs32_o = cs.exe.en.dmem_store ? rs2 : rs32_o;
-				valid_o = 1'b1;
-				ready_o = 1'b1;
 			end
 		end
 		ST_WAIT_FETCH: begin
 			ready_o = 1'b1;
-			valid_o = (state_e_d != ST_WAIT_FETCH);
+			valid_o = (state_e_d != ST_WAIT_FETCH) && valid_o_d;
+			if (interrupt_i) begin
+				jmp_target_o = interrupt_jmp_target_i;
+			end
 		end
 	endcase
 end

@@ -111,6 +111,11 @@ package typedefs;
 		DEC_ADD_SEL_REG
 	} cs_dec_add_sel;
 
+	typedef enum logic [2:0] {
+		JMP_TARGET_SEL_ADDER,
+		JMP_TARGET_SEL_MEPC
+	} cs_dec_jmp_target_sel;
+
 	typedef struct packed {
 		logic pff_lsu_addr_en;
 		logic pff_alu_b_en;
@@ -121,6 +126,7 @@ package typedefs;
 		cs_inst_type inst_type;
 		cs_alu_wb_sel alu_wb_sel;
 		cs_dec_add_sel add_sel;
+		cs_dec_jmp_target_sel jmp_target;
 		cs_ser_start ser_start;
 		cs_size dmem_load_size;
 		cs_ext dmem_load_ext;
@@ -248,6 +254,15 @@ package typedefs;
 		FNC3_CSRRSI = 3'b110,
 		FNC3_CSRRCI = 3'b111
 	} funct3_csr_e;
+
+	typedef enum logic [2:0] {
+		FNC3_PRIV = 3'b000
+	} funct3_system_e;
+
+	typedef enum logic [11:0] {
+		FNC12_MRET = 12'b001100000010
+	} funct12_e;
+
 
 //	typedef enum logic [2:0] {
 //		FNC3_JALR = 3'b000,

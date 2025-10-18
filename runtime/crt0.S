@@ -29,6 +29,10 @@ _start:
 la gp, __global_pointer$
 .option pop
 
+# Set trap handler
+  la t0, trap_entry
+  csrw mtvec, t0
+
   # Clear the bss segment
   la      a0, __bss_start
   la      a2, _end
@@ -50,6 +54,7 @@ la gp, __global_pointer$
 .Lweak_atexit:
 #endif
   call    __libc_init_array       # Run global initialization functions
+
 
   lw      a0, 0(sp)                  # a0 = argc
   addi    a1, sp, __SIZEOF_POINTER__ # a1 = argv

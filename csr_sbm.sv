@@ -10,8 +10,22 @@ module csr_sbm (
 	input logic [CSR_ADDR_LEN-1:0] addr_i,
 	input logic [HALF_XLEN-1:0] write_data_i,
 
+	input logic mepc_write_i,
+	input logic [XLEN-1:0] mepc_write_data_i,
+
+	input logic mcause_write_i,
+	input logic [XLEN-1:0] mcause_write_data_i,
+
+	input logic mip_set_i,
+	input logic [XLEN-1:0] mip_set_write_data_i,
+
 	output logic valid_o, /// <<< Used to prevent intermediary values to get sampled
-	output logic [HALF_XLEN-1:0] read_data_o
+	output logic [HALF_XLEN-1:0] read_data_o,
+
+	output logic [XLEN-1:0] mepc_o,
+	output logic [XLEN-1:0] mie_o,
+	output logic [XLEN-1:0] mip_o,
+	output logic [XLEN-1:0] mtvec_o
 );
 
 localparam bit [31:0] WMASK_DEFAULT = '1;
@@ -24,10 +38,11 @@ localparam bit [31:0] WMASK_MSTATUS = 32'h888, // Assign
 					  RESET_MSTATUS = (32'b11 << 11);
 
 localparam bit [11:0] ADDR_MIE = 12'h304;
-localparam logic [31:0] WMASK_MIE = '0; // Assign
+localparam logic [31:0] WMASK_MIE = '0, // Assign
+					  RESET_MIE = (32'b1 << 16) | (32'b1 << 11);
 
 localparam bit [11:0] ADDR_MTVEC = 12'h305;
-localparam logic [31:0] WMASK_MTVEC = '0,
+localparam logic [31:0] WMASK_MTVEC = '1 ^ 2'b11,
 						RESET_MTVEC = '0; // Assign
 
 
@@ -88,41 +103,46 @@ logic write_allowed;
 
 always_comb begin
 	unique case (addr_i)
-		// All implemented csrs are write allowed
+		//ADDR_MEPC: write_allowed = 
 		default:
 			write_allowed = 1'b1;
 	endcase
 end
 
+
 always_ff @(posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		mstatus <= RESET_MSTATUS;
 		mtvec <= RESET_MTVEC;
-
-		mie <= '0;
+		mie <= RESET_MIE;
 		mscratch <= '0;
 		mepc <= '0;
 		mcause <= '0;
 		mtval <= '0;
 		mip <= '0;
 		mtinst <= '0;
-	end else if (write_i) begin
-		if (write_allowed) begin
-			unique case (addr_i)
-				ADDR_MSTATUS: mstatus[h_sel_i] <= mask_o;
-				ADDR_MIE: mie[h_sel_i] <= mask_o;
-				ADDR_MTVEC: mtvec[h_sel_i] <= mask_o;
+	end else begin
+		if (write_i) begin
+			if (write_allowed) begin
+				unique case (addr_i)
+					ADDR_MSTATUS: mstatus[h_sel_i] <= mask_o;
+					ADDR_MIE: mie[h_sel_i] <= mask_o;
+					ADDR_MTVEC: mtvec[h_sel_i] <= mask_o;
 
-				ADDR_MSCRATCH: mscratch[h_sel_i] <= mask_o;
-				ADDR_MEPC: mepc[h_sel_i] <= mask_o;
-				ADDR_MCAUSE: mcause[h_sel_i] <= mask_o;
-				ADDR_MTVAL: mtval[h_sel_i] <= mask_o;
-				ADDR_MIP: mip[h_sel_i] <= mask_o;
-				ADDR_MTINST: mtinst[h_sel_i] <= mask_o;
-			endcase
-		end //else 
-			// Trap?
+					ADDR_MSCRATCH: mscratch[h_sel_i] <= mask_o;
+					ADDR_MEPC: mepc[h_sel_i] <= mask_o;
+					ADDR_MCAUSE: mcause[h_sel_i] <= mask_o;
+					ADDR_MTVAL: mtval[h_sel_i] <= mask_o;
+					ADDR_MIP: mip[h_sel_i] <= mask_o;
+					ADDR_MTINST: mtinst[h_sel_i] <= mask_o;
+				endcase
+			end //else write is not allowed
+			// Trap? atleast not on mepc_write_i
 		//end
+		end
+		if (mepc_write_i) mepc <= mepc_write_data_i;
+		if (mcause_write_i) mcause <= mcause_write_data_i;
+		if (mip_set_i) mip <= mip | mip_set_write_data_i; //! same cycle mip set by interrupt sbm and write by user problematic
 	end
 end
 
@@ -144,6 +164,11 @@ always_comb begin
 			read_data_o = 'x;
 	endcase
 end
+
+assign mepc_o = mepc;
+assign mie_o = mie;
+assign mip_o = mip;
+assign mtvec_o = mtvec;
 
 
 endmodule

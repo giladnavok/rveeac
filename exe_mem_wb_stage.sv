@@ -14,6 +14,8 @@ module exe_mem_wb_stage #(
 	input logic dmem_load_bypass_i, 			///< Bypass from ID stage - Start early load if possible
 	input cs_exe_s cs_i, 						///< Control signals
 	
+	input logic interrupt_req_ext_i, 			///< Bypass from ID stage - Start early load if possible
+	input logic dec_ready_for_interrupt_i,
 
 	//--
 	apb_if.master dmem_apb, 					///< DMEM APB Interface
@@ -28,10 +30,14 @@ module exe_mem_wb_stage #(
 	input logic [4:0] rs32_i, 					///< Register file 32 bit read port index
 	input logic [4:0] rs16_i, 					///< Register file 16 bit read port index
 	input logic [11:0] csr_addr_i, 				
+	input logic [31:0] fetch_pc_current_i,
+	input logic [31:0] dec_pc_i,
+	input logic dec_inst_jmp_or_branch_i,
 
 	// --------- Output Controls --------
 	output logic ready_o, 						///< Execution stage ready for new controls and data
 	output logic dmem_apb_ready_d_o, 						///< Execution stage ready for new controls and data
+	output logic interrupt_o,
 
 	// --------- Output Data --------- 
 	output logic [31:0] reg32_o, 				///< Register file 32 bit read port data
@@ -40,7 +46,9 @@ module exe_mem_wb_stage #(
 		output logic [15:0] registers_od [1:0][31:0],
 	`endif
 	output logic cmp_result_valid_o, 			///< Comperator result is valid for IF stage
-	output logic shift_bigger_then_16_o 		///< Signal ID to not forward lower half.
+	output logic shift_bigger_then_16_o, 		///< Signal ID to not forward lower half.
+	output logic [31:0] interrupt_jmp_target_o,
+	output logic [31:0] mepc_o
 
 );
 
@@ -94,6 +102,25 @@ logic csr_valid;
 logic [15:0] csr_read_data_out;
 
 logic [15:0] csr_imm_ext;
+
+logic [31:0] csr_mepc;
+logic [31:0] csr_mip;
+logic [31:0] csr_mie;
+logic [31:0] csr_mtvec;
+
+// Interrupt
+
+logic interrupt_req_aes;
+
+logic int_mepc_write;
+logic [31:0] int_mepc_write_data;
+
+logic int_mcause_write;
+logic [31:0] int_mcause_write_data;
+
+logic int_mip_set;
+logic [31:0] int_mip_set_data;
+
 
 // Misc
 logic first_two_cycles;
@@ -197,9 +224,52 @@ csr_sbm csr (
 	.addr_i(csr_addr),
 	.write_data_i(csr_write_data),
 
+	.mepc_write_i(int_mepc_write),
+	.mepc_write_data_i(int_mepc_write_data),
+
+	.mcause_write_i(int_mcause_write),
+	.mcause_write_data_i(int_mcause_write_data),
+
+	.mip_set_i(int_mip_set),
+	.mip_set_write_data_i(int_mip_set_data),
+
 	.valid_o(csr_valid),
-	.read_data_o(csr_read_data_out)
+	.read_data_o(csr_read_data_out), //! Continue connecting and check if dec changes harm
+
+	.mepc_o(csr_mepc),
+	.mie_o(csr_mie),
+	.mip_o(csr_mip),
+	.mtvec_o(csr_mtvec)
 );
+
+interrupt_sbm interrupt (
+	.clk(clk),
+	.rst_n(rst_n),
+	.interrupt_req_ext_i(interrupt_req_ext_i),
+	.interrupt_req_aes_i(interrupt_req_aes),
+
+	.fetch_pc_current_i(fetch_pc_current_i),
+	.dec_pc_i(dec_pc_i),
+	.dec_inst_jmp_or_branch_i(dec_inst_jmp_or_branch_i),
+	.dec_ready_for_interrupt_i(dec_ready_for_interrupt_i),
+
+	.mip_i(csr_mip),
+	.mie_i(csr_mie),
+	.mtvec_i(csr_mtvec),
+
+	.mepc_write_o(int_mepc_write),
+	.mepc_write_data_o(int_mepc_write_data),
+
+	.mcause_write_o(int_mcause_write),
+	.mcause_write_data_o(int_mcause_write_data),
+
+	.mip_set_o(int_mip_set),
+	.mip_set_data_o(int_mip_set_data),
+
+	.interrupt_jmp_target_o(interrupt_jmp_target_o),
+	.interrupt_o(interrupt_o)
+);
+
 
 // ===============================
 //			Internal Logic
@@ -289,6 +359,10 @@ end
 assign cmp_result_valid_o = alu_cmp_result_valid && first_two_cycles;
 assign ready_o = alu_cmp_result_valid || (accel_ready && load_store_ready && !first_cycle);
 assign reg32_o = reg32_data;
+assign mepc_o = csr_mepc;
+
+// TMP:
+assign interrupt_req_aes = 1'b0;
 
 endmodule
 

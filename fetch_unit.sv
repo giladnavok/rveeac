@@ -31,7 +31,8 @@ module fetch_unit # (
 
 	// --------- Output Data --------
 	output logic [31:0] inst_o, 			///< Output instruction
-	output logic [31:0] pc_o 				///< Output PC of instruction
+	output logic [31:0] pc_o, 				///< Output PC of instruction
+	output logic [31:0] pc_current_o 				///< Output PC of instruction
 );
 
 
@@ -47,6 +48,7 @@ logic [31:0] imem_apb_rdata;
 
 logic [31:0] imem_apb_fetch_address;
 logic [31:0] pc_next;
+logic [31:0] jmp_target_requested;
 
 logic take_branch;
 
@@ -59,6 +61,7 @@ logic [31:0] branch_alternative;
 logic [31:0] inst_buffer;
 logic inst_in_buffer_branch_jmp;
 logic branch_taken;
+logic jmp_requested;
 
 enum logic [2:0] {
 	ST_INIT_FETCH, ST_FETCH,
@@ -125,6 +128,8 @@ always_ff @(posedge clk or negedge rst_n) begin
 		branch_taken <= 1'b0;
 		inst_buffer <= '0;
 		branch_alternative <= '0;
+		jmp_requested <= '0;
+		jmp_target_requested <= '0;
 	end else begin
 		case (state_e)
 			ST_INIT_FETCH: begin
@@ -139,6 +144,7 @@ always_ff @(posedge clk or negedge rst_n) begin
 					pc_current <= imem_apb_fetch_address;
 					state_e <= ST_FETCH;
 				end
+				jmp_requested <= 1'b0;
 			end
 			ST_INIT_FETCH_SPEC: begin
 				if (branch_cmp_result_valid_i & (branch_taken != branch_cmp_result_i)) begin
@@ -153,10 +159,12 @@ always_ff @(posedge clk or negedge rst_n) begin
 					end else begin
 						state_e <= ST_FETCH;
 					end
-				end else begin
+				end else begin 
 					pc_current <= imem_apb_fetch_address;
 					state_e <= ST_FETCH_SPEC;
 				end
+
+				jmp_requested <= 1'b0;
 			end
 
 			ST_FULL_BUFFER: begin
@@ -173,6 +181,8 @@ always_ff @(posedge clk or negedge rst_n) begin
 			ST_FETCH: begin
 				//! Make sure can't reach here with branch_i
 				if (jmp_i) begin
+					jmp_requested <= 1'b1;
+					jmp_target_requested <= jmp_target_i;
 					state_e <= ST_FETCH_DISCARD;
 				end else if (imem_apb_valid) begin
 					if (ready_i) begin
@@ -187,7 +197,11 @@ always_ff @(posedge clk or negedge rst_n) begin
 				end 
 			end
 			ST_FETCH_SPEC: begin
-				if (branch_cmp_result_valid_i & (branch_taken != branch_cmp_result_i)) begin
+				if (jmp_i) begin // must come from an interrupt, in that case the branch is re executed 
+					jmp_requested <= 1'b1;
+					jmp_target_requested <= jmp_target_i;
+					state_e <= ST_FETCH_DISCARD;
+				end else if (branch_cmp_result_valid_i && (branch_taken != branch_cmp_result_i)) begin
 					pc_current <= branch_alternative;
 					if (imem_apb_ready) begin
 						state_e <= ST_INIT_FETCH;
@@ -211,6 +225,10 @@ always_ff @(posedge clk or negedge rst_n) begin
 				end
 			end
 			ST_FETCH_DISCARD: begin
+				if (jmp_i) begin
+					jmp_requested <= 1'b1;
+					jmp_target_requested <= jmp_target_i;
+				end
 				if (imem_apb_ready) begin
 					state_e <= ST_INIT_FETCH;
 				end
@@ -246,6 +264,7 @@ end
 assign pc_next = pc_current + 4;
 assign inst_in_buffer_branch_jmp = (inst_buffer[6:0] inside {OPC_BRANCH, OPC_JAL, OPC_JALR});
 assign misspredict_o = branch_cmp_result_valid_i && (branch_taken != branch_cmp_result_i);
+assign pc_current_o = pc_current;
 always_comb begin
 	case (state_e)
 		ST_INIT_FETCH: begin
@@ -253,7 +272,9 @@ always_comb begin
 			inst_o = 32'hxxxxxxxx;
 			pc_o = 32'hxxxxxxxx;
 			imem_apb_start = !stall_for_jmp_target_i;
-			if (jmp_i | (branch_i & take_branch)) begin
+			if (jmp_requested) begin
+				imem_apb_fetch_address = jmp_target_requested;
+			end else if (jmp_i || (branch_i & take_branch)) begin
 				imem_apb_fetch_address = jmp_target_i;
 			end else begin
 				imem_apb_fetch_address = pc_current;
