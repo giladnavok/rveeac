@@ -351,6 +351,7 @@ always_comb begin
 								// --------------- //
 								// Sel //
 								// Enable //
+								cs_o.exe.en.csr_restore_mstatus_mie = ENABLE;
 							end
 						endcase
 					end

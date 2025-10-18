@@ -2,7 +2,7 @@
 module apb_router #(
 	parameter DMEM_BASE = 32'h0000_4000,
 	parameter DMEM_BYTES = 4*(1<<16),
-	parameter UART_ADDR = 32'h1000_0000
+	parameter PERIPHERAL_BASE = 32'h1000_0000
 ) (
 	apb_if.slave s_core,
 	apb_if.master m_dmem,
@@ -16,7 +16,7 @@ logic [31:0] dmem_addr_offset;
 assign dmem_addr_offset = s_core.addr - DMEM_BASE;
 
 assign sel_dmem = s_core.sel && (s_core.addr >= DMEM_BASE) && (s_core.addr <= DMEM_LIMIT);
-assign sel_uart = s_core.sel && (s_core.addr == UART_ADDR);
+assign sel_uart = s_core.sel && (s_core.addr >= PERIPHERAL_BASE);
 
 // Broadcast all signals but sel
 assign m_dmem.enable = s_core.enable;

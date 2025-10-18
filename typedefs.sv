@@ -174,6 +174,7 @@ package typedefs;
 		logic accel_load_key;
 		logic csr_write;
 		logic csr_req;
+		logic csr_restore_mstatus_mie;
 	} cs_exe_en_s;
 
 	typedef struct packed {
@@ -303,7 +304,8 @@ package typedefs;
 			accel_start_dec: DISABLE,
 			accel_load_key: DISABLE,
 			csr_write: DISABLE,
-			csr_req: DISABLE
+			csr_req: DISABLE,
+			csr_restore_mstatus_mie: DISABLE
 		};
 endpackage
 

@@ -109,6 +109,8 @@ logic [31:0] csr_mie;
 logic [31:0] csr_mtvec;
 logic csr_mstatus_mie;
 
+logic restore_mstatus_mie;
+
 // Interrupt
 
 logic interrupt_req_aes;
@@ -119,8 +121,7 @@ logic [31:0] int_mepc_write_data;
 logic int_mcause_write;
 logic [31:0] int_mcause_write_data;
 
-logic int_mip_set;
-logic [31:0] int_mip_set_data;
+logic int_store_clear_mstatus_mie;
 
 
 // Misc
@@ -222,6 +223,9 @@ csr_sbm csr (
 	.write_i(csr_write),
 	.h_sel_i(csr_h_sel),
 
+	.interrupt_req_ext_i(interrupt_req_ext_i),
+	.interrupt_req_aes_i(interrupt_req_aes),
+
 	.addr_i(csr_addr),
 	.write_data_i(csr_write_data),
 
@@ -231,8 +235,8 @@ csr_sbm csr (
 	.mcause_write_i(int_mcause_write),
 	.mcause_write_data_i(int_mcause_write_data),
 
-	.mip_set_i(int_mip_set),
-	.mip_set_write_data_i(int_mip_set_data),
+	.store_clear_mstatus_mie_i(int_store_clear_mstatus_mie),
+	.restore_mstatus_mie_i(restore_mstatus_mie),
 
 	.valid_o(csr_valid),
 	.read_data_o(csr_read_data_out), //! Continue connecting and check if dec changes harm
@@ -247,8 +251,6 @@ csr_sbm csr (
 interrupt_sbm interrupt (
 	.clk(clk),
 	.rst_n(rst_n),
-	.interrupt_req_ext_i(interrupt_req_ext_i),
-	.interrupt_req_aes_i(interrupt_req_aes),
 
 	.fetch_pc_current_i(fetch_pc_current_i),
 	.dec_pc_i(dec_pc_i),
@@ -266,9 +268,7 @@ interrupt_sbm interrupt (
 	.mcause_write_o(int_mcause_write),
 	.mcause_write_data_o(int_mcause_write_data),
 
-	.mip_set_o(int_mip_set),
-	.mip_set_data_o(int_mip_set_data),
-
+	.store_clear_mstatus_mie_o(int_store_clear_mstatus_mie),
 	.interrupt_jmp_target_o(interrupt_jmp_target_o),
 	.interrupt_o(interrupt_o)
 );
@@ -341,6 +341,8 @@ assign accel_start_dec = cs_i.en.accel_start_dec && valid_i && first_cycle;
 assign csr_write = valid_i && cs_i.en.csr_write;
 assign csr_h_sel = cs_i.en.csr_req && !first_cycle;
 assign csr_addr = csr_addr_i;
+
+assign restore_mstatus_mie = first_cycle && cs_i.en.csr_restore_mstatus_mie;
 
 assign first_two_cycles = first_cycle || first_cycle_d;
 

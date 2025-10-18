@@ -7,11 +7,14 @@ localparam IMEM_SIZE = 1 << 17;
 localparam DMEM_SIZE = 1 << 17;
 localparam DMEM_SIZE_BYTES = 4*DMEM_SIZE;
 localparam DMEM_OFFSET = 32'h20000;
+localparam PERIPHERAL_BASE = 32'h1000_0000;
 localparam UART_ADDR = 32'h1000_0000;
+localparam CLEAR_ME_IRQ = 32'h1000_0001;
 
 logic clk;
 logic rst_n;
 logic interrupt_req_ext;
+logic trigger_interrupt_req_ext;
 logic [31:0] inst;
 logic [31:0] inst_d;
 logic [15:0] registers_halfs [1:0][31:0];
@@ -59,7 +62,7 @@ apb_slave_byte # (
 apb_router # (
 	.DMEM_BASE(DMEM_OFFSET),
 	.DMEM_BYTES(DMEM_SIZE_BYTES),
-	.UART_ADDR(UART_ADDR)
+	.PERIPHERAL_BASE(PERIPHERAL_BASE)
 ) apb_router_inst (
 	.s_core(router_apb.slave),
 	.m_dmem(dmem_apb.master),
@@ -78,11 +81,20 @@ core core_inst (
 assign uart_apb.ready = 1'b1;
 assign uart_apb.slverr = 1'b0;
 assign uart_apb.rdata = 32'b0;
-always_ff @(posedge clk) begin
-	if (uart_apb.sel && !uart_apb.enable && uart_apb.write) begin
-		static byte ch;
-	   	ch = uart_apb.wdata[7:0];
-		$write("%c", ch);
+always_ff @(posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		interrupt_req_ext <= 1'b0;
+	end else begin
+		if (trigger_interrupt_req_ext) interrupt_req_ext <= 1'b1;
+		if (uart_apb.sel && !uart_apb.enable && uart_apb.write) begin
+			if (uart_apb.addr == UART_ADDR) begin
+				static byte ch;
+				ch = uart_apb.wdata[7:0];
+				$write("%c", ch);
+			end else if (uart_apb.addr == CLEAR_ME_IRQ) begin
+				interrupt_req_ext <= 1'b0;
+			end
+		end
 	end
 end
 
@@ -93,8 +105,8 @@ always #2 clk = ~clk;
 
 initial begin
 	rst_n = 1'b0;
-	interrupt_req_ext = 1'b0;
 	clk = 1'b0;
+	trigger_interrupt_req_ext = 1'b0;
 	#1 rst_n = 1'b1;
 end
 
@@ -107,8 +119,8 @@ end
 
 always begin
 	#400000;
-	@(posedge clk) interrupt_req_ext = 1'b1;
-	@(posedge clk) interrupt_req_ext = 1'b0;
+	trigger_interrupt_req_ext = 1'b1;
+	#4 trigger_interrupt_req_ext = 1'b0;
 end
 
 endmodule

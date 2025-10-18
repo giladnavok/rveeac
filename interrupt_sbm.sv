@@ -4,9 +4,6 @@ module interrupt_sbm (
 	input logic clk,
 	input logic rst_n,
 
-	input logic interrupt_req_ext_i,
-	input logic interrupt_req_aes_i,
-
 	input logic [31:0] fetch_pc_current_i,
 	input logic [31:0] dec_pc_i,
 	input logic dec_inst_jmp_or_branch_i,
@@ -23,67 +20,54 @@ module interrupt_sbm (
 	output logic mcause_write_o,
 	output logic [31:0] mcause_write_data_o,
 
-	output logic mip_set_o,
-	output logic [31:0] mip_set_data_o,
-
+	output logic store_clear_mstatus_mie_o,
 	output logic [31:0] interrupt_jmp_target_o,
 	output logic interrupt_o
 );
 
 logic interrupt;
 
-
 always_comb begin
 	mepc_write_o = 1'b0;
 	mcause_write_o = 1'b0;
-	mip_set_o = 1'b0;
 
 	mepc_write_data_o = 32'b0;
 	mcause_write_data_o = 32'b0;
-	mip_set_data_o = 32'b0;
+
+	store_clear_mstatus_mie_o = 1'b0;
 
 
 	interrupt = 1'b0;
+	if (mstatus_mie_i) begin
+		if ((mip_i[16] && mie_i[16])) begin
+			if (mstatus_mie_i && mie_i[16]) begin
+				mepc_write_o = dec_ready_for_interrupt_i;
+				mepc_write_data_o = dec_inst_jmp_or_branch_i ? dec_pc_i : fetch_pc_current_i;
 
-	if (interrupt_req_aes_i || (mip_i[16] && mie_i[16])) begin
-		if (mie_i[16]) begin
-			mepc_write_o = dec_ready_for_interrupt_i;
-			mepc_write_data_o = dec_inst_jmp_or_branch_i ? dec_pc_i : fetch_pc_current_i;
+				mcause_write_o = dec_ready_for_interrupt_i;
+				mcause_write_data_o = {1'b1, 31'd16};
 
-			mcause_write_o = dec_ready_for_interrupt_i;
-			mcause_write_data_o = {1'b1, 31'd16};
+				interrupt = 1'b1;
+			end
+		end
 
-			interrupt = 1'b1;
+		//! Make sure the difference is only in the cause code
+		if ((mip_i[11] && mie_i[11])) begin
+			if (mstatus_mie_i && mie_i[11]) begin
+				mepc_write_o = dec_ready_for_interrupt_i;
+				mepc_write_data_o = dec_inst_jmp_or_branch_i ? dec_pc_i : fetch_pc_current_i;
 
-			//! Maybe need to also set mip
-		end else begin
-			mip_set_o = 1'b1;
-			mip_set_data_o = 1 << 16;
+				mcause_write_o = dec_ready_for_interrupt_i;
+				mcause_write_data_o = {1'b1, 31'd11};
+
+				interrupt = 1'b1;
+			end 
 		end
 	end
 
-	//! Make sure the difference is only in the cause code
-	if (interrupt_req_ext_i || (mip_i[11] && mie_i[11])) begin
-		if (mie_i[11]) begin
-			mepc_write_o = dec_ready_for_interrupt_i;
-			mepc_write_data_o = dec_inst_jmp_or_branch_i ? dec_pc_i : fetch_pc_current_i;
-
-			mcause_write_o = dec_ready_for_interrupt_i;
-			mcause_write_data_o = {1'b1, 31'd11};
-
-			interrupt = 1'b1;
-
-			//! Maybe need to also set mip
-		end else begin
-			mip_set_o = 1'b1;
-			mip_set_data_o = 1 << 11;
-		end
-	end
-
-	interrupt_o = mstatus_mie_i ? 
-		(dec_ready_for_interrupt_i ? interrupt : 1'b0 ) :
-	   	1'b0;
+	interrupt_o = (dec_ready_for_interrupt_i ? interrupt : 1'b0 );
 	interrupt_jmp_target_o = interrupt_o ? mtvec_i : 32'b0;
+	store_clear_mstatus_mie_o = interrupt_o;
 end
 
 endmodule 

@@ -7,6 +7,9 @@ module csr_sbm (
 	input logic write_i,
 	input logic h_sel_i,
 
+	input logic interrupt_req_ext_i,
+	input logic interrupt_req_aes_i,
+
 	input logic [CSR_ADDR_LEN-1:0] addr_i,
 	input logic [HALF_XLEN-1:0] write_data_i,
 
@@ -16,8 +19,8 @@ module csr_sbm (
 	input logic mcause_write_i,
 	input logic [XLEN-1:0] mcause_write_data_i,
 
-	input logic mip_set_i,
-	input logic [XLEN-1:0] mip_set_write_data_i,
+	input logic store_clear_mstatus_mie_i,
+	input logic restore_mstatus_mie_i,
 
 	output logic valid_o, /// <<< Used to prevent intermediary values to get sampled
 	output logic [HALF_XLEN-1:0] read_data_o,
@@ -56,6 +59,7 @@ localparam bit [11:0] ADDR_MCAUSE = 12'h342;
 localparam bit [11:0] ADDR_MTVAL = 12'h343;
 
 localparam bit [11:0] ADDR_MIP = 12'h344;
+localparam logic [31:0] WMASK_MIP = WMASK_MIE;
 
 localparam bit [11:0] ADDR_MTINST = 12'h34A;
 //localparam bit [11:0] ADDR_MTVAL2 = 12'h34B;
@@ -63,6 +67,8 @@ localparam bit [11:0] ADDR_MTINST = 12'h34A;
 // ----------------------------- //
 // CSR Parameters Definition END //
 
+
+logic [31:0] mip;
 
 logic [1:0][HALF_XLEN-1:0]
 	mstatus,
@@ -73,7 +79,6 @@ logic [1:0][HALF_XLEN-1:0]
 	mepc,
 	mcause,
 	mtval,
-	mip,
 	mtinst;
 
 
@@ -111,6 +116,11 @@ always_comb begin
 	endcase
 end
 
+always_comb begin
+	mip = '0;
+	mip[11] = interrupt_req_ext_i;
+	mip[16] = interrupt_req_aes_i;
+end
 
 always_ff @(posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
@@ -121,7 +131,6 @@ always_ff @(posedge clk or negedge rst_n) begin
 		mepc <= '0;
 		mcause <= '0;
 		mtval <= '0;
-		mip <= '0;
 		mtinst <= '0;
 	end else begin
 		if (write_i) begin
@@ -135,7 +144,7 @@ always_ff @(posedge clk or negedge rst_n) begin
 					ADDR_MEPC: mepc[h_sel_i] <= mask_o;
 					ADDR_MCAUSE: mcause[h_sel_i] <= mask_o;
 					ADDR_MTVAL: mtval[h_sel_i] <= mask_o;
-					ADDR_MIP: mip[h_sel_i] <= mask_o;
+					ADDR_MIP: ; // WARL
 					ADDR_MTINST: mtinst[h_sel_i] <= mask_o;
 				endcase
 			end //else write is not allowed
@@ -144,7 +153,13 @@ always_ff @(posedge clk or negedge rst_n) begin
 		end
 		if (mepc_write_i) mepc <= mepc_write_data_i;
 		if (mcause_write_i) mcause <= mcause_write_data_i;
-		if (mip_set_i) mip <= mip | mip_set_write_data_i; //! same cycle mip set by interrupt sbm and write by user problematic
+		if (store_clear_mstatus_mie_i) begin
+			mstatus[0][7] <= mstatus[0][3];
+			mstatus[0][3] <= 1'b0;
+		end
+		if (restore_mstatus_mie_i) begin
+			mstatus[0][3] <= mstatus[0][7];
+		end
 	end
 end
 
