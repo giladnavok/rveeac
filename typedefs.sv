@@ -145,6 +145,7 @@ package typedefs;
 		logic csr_addr;
 		logic csr_imm_bypass;
 		logic wait_for_interrupt;
+		logic wait_for_accel;
 	} cs_dec_en_s;
 
 	typedef struct packed {
@@ -245,7 +246,8 @@ package typedefs;
 	typedef enum logic [2:0] {
 		FNC3_LD_KEY = 3'b000,
 		FNC3_ST_ENC = 3'b001,
-		FNC3_ST_DEC = 3'b010
+		FNC3_ST_DEC = 3'b010,
+		FNC3_SYNC = 3'b100
 	} funct3_accel_e;
 
 	typedef enum logic [2:0] {
@@ -292,7 +294,8 @@ package typedefs;
 			forward_just_one_half: DISABLE,
 			csr_addr: DISABLE,
 			csr_imm_bypass: DISABLE,
-			wait_for_interrupt: DISABLE
+			wait_for_interrupt: DISABLE,
+			wait_for_accel: DISABLE
 		};
 	parameter cs_exe_en_s 
 	CS_EXE_EN_DEFAULT = '{

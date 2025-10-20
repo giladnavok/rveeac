@@ -15,6 +15,7 @@ module decode_unit (
 												///  and should be flushed.
 	input logic interrupt_i, 					///< Triggers an interrupt when asserted.
 	
+	input logic accel_ready_i,			
 
 	// --------- Input Data  ------------
 	input logic [31:0] inst_i, 					///< Instruction from IF stage
@@ -33,8 +34,7 @@ module decode_unit (
 	output logic exe_first_cycle_o, 			///< First cycle signal for EXE stage
 	output logic fetch_stall_for_jmp_target_o,	///< Asserted when the IF stage should pause fetching, until the 
 												///  correct jump target is outputed.
-	output logic inst_jmp_or_branch_o,			///< Asserted when the currently executing instrucion is a jump 
-												///  or a branch.
+	output logic resume_execution_from_dec_inst_o,			
 												
 	output logic ready_for_interrupt_o,			///< Asserted when the ID is ready to recieve an interrupt.
 
@@ -70,6 +70,8 @@ logic issue;
 
 logic signal_jmp_issue_first;
 logic signal_jmp_wait_fetch_or_interrupt;
+
+logic inst_jmp_or_branch;
 
 logic [31:0] jmp_target;
 
@@ -148,7 +150,7 @@ imm_gen_sbm imm_gen (
 // 	 				  otherwise switch to ST_WAIT_FETCH to wait for IF.
 // * ST_WAIT_FETCH: Wait for IF stage to finish fetching.
 
-enum logic [1:0] {ST_ISSUE_FIRST, ST_ISSUE_SECOND, ST_WAIT_FETCH, ST_WAIT_INTERRUPT} state_e;
+enum logic [1:0] {ST_ISSUE_FIRST, ST_ISSUE_SECOND, ST_WAIT_FETCH, ST_WAIT_FOR} state_e;
 
 localparam logic [31:0] NOP = 32'h00000013;
 always_ff @(posedge clk or negedge rst_n) begin
@@ -159,8 +161,8 @@ always_ff @(posedge clk or negedge rst_n) begin
 	end else begin
 		case (state_e)
 			ST_ISSUE_FIRST: begin
-				if (cs.dec.en.wait_for_interrupt) begin
-					state_e <= ST_WAIT_INTERRUPT;
+				if (cs.dec.en.wait_for_interrupt || cs.dec.en.wait_for_accel) begin
+					state_e <= ST_WAIT_FOR;
 				end else if (ready_i) begin
 					state_e <= misspredict_i ? ST_WAIT_FETCH :
 						stall_one_cycle ? ST_ISSUE_FIRST : ST_ISSUE_SECOND;
@@ -178,9 +180,18 @@ always_ff @(posedge clk or negedge rst_n) begin
 				end
 					
 			end
-			ST_WAIT_INTERRUPT: begin
+			ST_WAIT_FOR: begin
 				if (interrupt_i) begin
 					state_e <= ST_WAIT_FETCH;
+				end
+				if (cs.dec.en.wait_for_accel && accel_ready_i) begin
+					if (valid_i) begin
+						inst <= inst_i;
+						pc <= pc_i;
+						state_e <= ST_ISSUE_FIRST;
+					end else begin
+						state_e <= ST_WAIT_FETCH;
+					end
 				end
 			end
 		endcase
@@ -215,7 +226,7 @@ always_ff @(posedge clk or negedge rst_n) begin
 		case (state_e) 
 			ST_ISSUE_FIRST: signaled_jmp <= signal_jmp_issue_first;
 			ST_ISSUE_SECOND: signaled_jmp <= 1'b0;
-			ST_WAIT_FETCH, ST_WAIT_INTERRUPT: signaled_jmp <= !valid_i && signal_jmp_wait_fetch_or_interrupt;
+			ST_WAIT_FETCH, ST_WAIT_FOR: signaled_jmp <= !valid_i && signal_jmp_wait_fetch_or_interrupt;
 		endcase
 	end
 end
@@ -346,7 +357,7 @@ assign signal_jmp_issue_first =
 	(interrupt_i || (fetch_stall_for_jmp_target_o ? 1'b0 : cs.dec.en.jmp));
 
 assign signal_jmp_wait_fetch_or_interrupt = 
-	(state_e inside {ST_WAIT_FETCH, ST_WAIT_INTERRUPT}) && 
+	(state_e inside {ST_WAIT_FETCH, ST_WAIT_FOR}) && 
 	(interrupt_i);
 
 always_comb begin
@@ -371,7 +382,8 @@ assign first_cycle = (state_e == ST_ISSUE_FIRST);
 assign issue = (((state_e == ST_ISSUE_FIRST) && ready_i && !cs.dec.en.wait_for_interrupt && !stall_one_cycle) || (state_e ==  ST_ISSUE_SECOND)) && !misspredict_i;
 assign jmp_o = signaled_jmp ? 1'b0 : (signal_jmp_issue_first || signal_jmp_wait_fetch_or_interrupt);
 
-assign inst_jmp_or_branch_o = (opcode inside {OPC_BRANCH, OPC_JAL, OPC_JALR});
+assign inst_jmp_or_branch = (opcode inside {OPC_BRANCH, OPC_JAL, OPC_JALR});
+assign resume_execution_from_dec_inst_o = inst_jmp_or_branch || cs.dec.en.wait_for_accel;
 assign ready_for_interrupt_o = (state_e != ST_ISSUE_SECOND);
 assign pc_o = pc;
 always_comb begin
@@ -386,7 +398,7 @@ always_comb begin
 	fetch_stall_for_jmp_target_o = cs.dec.en.jmp && full_read_after_write && !issue;
 	case (state_e)
 		ST_ISSUE_FIRST: begin
-			if (!(interrupt_i && inst_jmp_or_branch_o)) begin
+			if (!(interrupt_i && inst_jmp_or_branch)) begin
 				if (ready_i || !stall_one_cycle || !fetch_stall_for_jmp_target_o) begin
 					branch_o = cs.dec.en.branch;
 					jmp_target_o = (cs.dec.en.jmp || cs.dec.en.branch) ? jmp_target : '0;
@@ -427,9 +439,12 @@ always_comb begin
 				jmp_target_o = interrupt_jmp_target_i;
 			end
 		end
-		ST_WAIT_INTERRUPT: begin
+		ST_WAIT_FOR: begin
 			if (interrupt_i) begin
 				jmp_target_o = interrupt_jmp_target_i;
+			end
+			if (cs.dec.en.wait_for_accel && accel_ready_i) begin
+				ready_o = valid_i;
 			end
 		end
 	endcase

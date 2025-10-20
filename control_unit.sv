@@ -380,9 +380,10 @@ always_comb begin
 			// Sel //
 			// Enable //
 			case (funct3_accel_e'(funct3_i))
-				FNC3_LD_KEY: cs_o.exe.en.accel_load_key = ENABLE;
+				FNC3_LD_KEY: cs_o.exe.en.accel_load_key  = ENABLE;
 				FNC3_ST_ENC: cs_o.exe.en.accel_start_enc = ENABLE;
 				FNC3_ST_DEC: cs_o.exe.en.accel_start_dec = ENABLE;
+				FNC3_SYNC:   cs_o.dec.en.wait_for_accel  = ENABLE;
 			endcase
 		end
 	endcase

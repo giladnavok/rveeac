@@ -6,7 +6,7 @@ module interrupt_sbm (
 
 	input logic [31:0] fetch_pc_current_i,
 	input logic [31:0] dec_pc_i,
-	input logic dec_inst_jmp_or_branch_i,
+	input logic dec_resume_execution_from_dec_inst_i,
 	input logic dec_ready_for_interrupt_i,
 
 	input logic [31:0] mip_i,
@@ -56,7 +56,7 @@ always_comb begin
 
 	if (interrupt && dec_ready_for_interrupt_i) begin
 		mepc_write_o = 1'b1;
-		mepc_write_data_o = dec_inst_jmp_or_branch_i ? dec_pc_i : fetch_pc_current_i;
+		mepc_write_data_o = dec_resume_execution_from_dec_inst_i ? dec_pc_i : fetch_pc_current_i;
 		mcause_write_o = 1'b1;
 		mcause_write_data_o = {1'b1, 26'b0, cause};
 		interrupt_o = 1'b1;

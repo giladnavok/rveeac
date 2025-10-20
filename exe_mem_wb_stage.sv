@@ -32,8 +32,7 @@ module exe_mem_wb_stage #(
 	input logic [11:0] csr_addr_i, 				///< CSR Address
 	input logic [31:0] fetch_pc_current_i, 		///< PC of currently fetched instruction in IF stage
 	input logic [31:0] dec_pc_i,				///< PC of currently decoded instruction in ID stage
-	input logic dec_inst_jmp_or_branch_i,		///< Indicates whether the currently decoded instrucion in ID stage
-												///  is a jump or a branch.
+	input logic dec_resume_execution_from_dec_inst_i,	
 
 	// --------- Output Controls --------
 	output logic ready_o, 						///< Execution stage ready for new controls and data
@@ -50,7 +49,8 @@ module exe_mem_wb_stage #(
 	output logic cmp_result_valid_o, 			///< Comperator result is valid for IF stage
 	output logic shift_bigger_then_16_o, 		///< Signal ID to not forward lower half.
 	output logic [31:0] interrupt_jmp_target_o, ///< Interrupt jump target
-	output logic [31:0] mepc_o 					///< CSR MEPC data
+	output logic [31:0] mepc_o, 					///< CSR MEPC data
+	output logic accel_ready_o
 
 );
 
@@ -256,7 +256,7 @@ interrupt_sbm interrupt (
 
 	.fetch_pc_current_i(fetch_pc_current_i),
 	.dec_pc_i(dec_pc_i),
-	.dec_inst_jmp_or_branch_i(dec_inst_jmp_or_branch_i),
+	.dec_resume_execution_from_dec_inst_i(dec_resume_execution_from_dec_inst_i),
 	.dec_ready_for_interrupt_i(dec_ready_for_interrupt_i),
 
 	.mip_i(csr_mip),
@@ -367,6 +367,7 @@ assign cmp_result_valid_o = alu_cmp_result_valid && first_two_cycles;
 assign ready_o = alu_cmp_result_valid || (accel_ready && load_store_ready && !first_cycle);
 assign reg32_o = reg32_data;
 assign mepc_o = csr_mepc;
+assign accel_ready_o = accel_ready;
 
 // TMP:
 assign interrupt_req_aes = 1'b0;

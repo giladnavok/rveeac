@@ -40,7 +40,7 @@ logic [4:0] dec_rs32_out;
 logic [4:0] dec_rs16_out;
 logic dec_inst31_out;
 logic dec_stall_for_jmp_target;
-logic dec_inst_jmp_or_branch;
+logic dec_resume_execution_from_dec_inst;
 logic dec_ready_for_interrupt;
 logic [31:0] dec_pc;
 
@@ -54,6 +54,7 @@ logic exe_dmem_apb_ready_d;
 logic [31:0] exe_mepc;
 
 logic exe_interrupt;
+logic exe_accel_ready;
 logic [31:0] exe_interrupt_jmp_target;
 
 //logic dec_flush;
@@ -112,6 +113,7 @@ decode_unit decode (
 	.exe_dmem_apb_ready_d_i(exe_dmem_apb_ready_d),
 	.misspredict_i(fetch_misspredict),
 	.interrupt_i(exe_interrupt),
+	.accel_ready_i(exe_accel_ready),
 
 	.inst_i(fetch_inst_out),
 	.pc_i(fetch_pc_out),
@@ -127,7 +129,7 @@ decode_unit decode (
 	.dmem_load_bypass_o(dec_dmem_load_bypass),
 	.exe_first_cycle_o(exe_first_cycle),
 	.fetch_stall_for_jmp_target_o(dec_stall_for_jmp_target),
-	.inst_jmp_or_branch_o(dec_inst_jmp_or_branch),
+	.resume_execution_from_dec_inst_o(dec_resume_execution_from_dec_inst),
 	.ready_for_interrupt_o(dec_ready_for_interrupt),
 
 	.lsu_store_addr_o(dec_lsu_store_addr_out),
@@ -167,7 +169,7 @@ exe_mem_wb_stage exe_mem_wb (
 	.csr_addr_i(dec_csr_addr_out),
 	.fetch_pc_current_i(fetch_pc_current),
 	.dec_pc_i(dec_pc),
-	.dec_inst_jmp_or_branch_i(dec_inst_jmp_or_branch),
+	.dec_resume_execution_from_dec_inst_i(dec_resume_execution_from_dec_inst),
 
 	.ready_o(exe_ready),
 	.reg32_o(exe_reg32_out),
@@ -181,6 +183,7 @@ exe_mem_wb_stage exe_mem_wb (
 	.cmp_result_valid_o(exe_cmp_result_valid),
 	.dmem_apb_ready_d_o(exe_dmem_apb_ready_d),
 	.interrupt_o(exe_interrupt),
+	.accel_ready_o(exe_accel_ready),
 	.interrupt_jmp_target_o(exe_interrupt_jmp_target),
 	.mepc_o(exe_mepc)
 );
