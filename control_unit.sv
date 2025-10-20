@@ -293,7 +293,7 @@ always_comb begin
 				end
 			endcase
 		end
-		OPC_SYSTEM: begin //!Continue
+		OPC_SYSTEM: begin
 			if (funct3_i inside {
 				FNC3_CSRRW, FNC3_CSRRWI,
 				FNC3_CSRRS, FNC3_CSRRSI,

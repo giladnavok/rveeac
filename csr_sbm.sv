@@ -1,10 +1,10 @@
 import typedefs::*;
 
 module csr_sbm (
-	input logic clk,
-	input logic rst_n,
+	input logic clk, 			
+	input logic rst_n, 				
 
-	input logic write_i,
+	input logic write_i,				
 	input logic h_sel_i,
 
 	input logic interrupt_req_ext_i,
@@ -22,7 +22,7 @@ module csr_sbm (
 	input logic store_clear_mstatus_mie_i,
 	input logic restore_mstatus_mie_i,
 
-	output logic valid_o, /// <<< Used to prevent intermediary values to get sampled
+	output logic valid_o,
 	output logic [HALF_XLEN-1:0] read_data_o,
 
 	output logic mstatus_mie_o,
@@ -34,20 +34,20 @@ module csr_sbm (
 
 localparam bit [31:0] WMASK_DEFAULT = '1;
 
-// CSR Parameters Definition // //! Continue
+// CSR Parameters Definition // 
 // ------------------------- //
 
 localparam bit [11:0] ADDR_MSTATUS = 12'h300;
-localparam bit [31:0] WMASK_MSTATUS = 32'h888, // Assign
+localparam bit [31:0] WMASK_MSTATUS = 32'h888, 
 					  RESET_MSTATUS = (32'b11 << 11) | (32'b1 << 3);
 
 localparam bit [11:0] ADDR_MIE = 12'h304;
-localparam logic [31:0] WMASK_MIE = '1, // Assign
+localparam logic [31:0] WMASK_MIE = '1, 
 					  RESET_MIE = (32'b1 << 16) | (32'b1 << 11);
 
 localparam bit [11:0] ADDR_MTVEC = 12'h305;
 localparam logic [31:0] WMASK_MTVEC = '1 ^ 2'b11,
-						RESET_MTVEC = '0; // Assign
+						RESET_MTVEC = '0; 
 
 
 localparam bit [11:0] ADDR_MSCRATCH = 12'h340;
@@ -67,9 +67,7 @@ localparam bit [11:0] ADDR_MTINST = 12'h34A;
 // ----------------------------- //
 // CSR Parameters Definition END //
 
-
-logic [31:0] mip;
-
+// Registered CSRs
 logic [1:0][HALF_XLEN-1:0]
 	mstatus,
 	mie,
@@ -81,6 +79,8 @@ logic [1:0][HALF_XLEN-1:0]
 	mtval,
 	mtinst;
 
+// Non-registerd CSRs
+logic [31:0] mip;
 
 // Masked Write Logic //
 // ------------------ //

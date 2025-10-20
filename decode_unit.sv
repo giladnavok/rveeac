@@ -8,43 +8,49 @@ module decode_unit (
 	// --------- Input Controls  --------
 	input logic ready_i, 						///< Execution stage can accept controls and data
 	input logic valid_i, 						///< Input data from IF stage is valid
-	input logic exe_dmem_apb_ready_d_i, 				///<  !!!!
-	input logic misspredict_i, 				///<  !!!!
-	input logic interrupt_i, 				///<  !!!!
+	input logic exe_dmem_apb_ready_d_i, 		///< If the dmem apb interface in EXE stage is ready
+												///	 indicates whether a load bypass is possible
+												
+	input logic misspredict_i, 					///< Signals the current instruction was misspredicted 
+												///  and should be flushed.
+	input logic interrupt_i, 					///< Triggers an interrupt when asserted.
 	
 
 	// --------- Input Data  ------------
 	input logic [31:0] inst_i, 					///< Instruction from IF stage
 	input logic [31:0] pc_i, 					///< Instruction's PC from IF stage
 	input logic [31:0] reg32_i, 				///< 32 bit register port data.
-	input logic [31:0] interrupt_jmp_target_i, 				///<  !!!!
-	input logic [31:0] mepc_i, 				///<  !!!!
+	input logic [31:0] interrupt_jmp_target_i, 	///< Valid when an interrupt is asserted and contains the interrupt 												///  jump target.
+	input logic [31:0] mepc_i, 					///< The value of the MEPC CSR. Used as a jump target in MRET.
 
 	// --------- Output Controls --------
-	output cs_exe_s cs_exe_o, 					///< Control signals for execution stage
+	output cs_exe_s cs_exe_o, 					///< Control signals for EXE stage
 	output logic jmp_o, 						///< Jump signal for IF stage.
 	output logic branch_o, 						///< Branch signal for IF stage
 	output logic ready_o, 						///< Instruction decode finished, ready for next instruction
-	output logic valid_o, 						///< Control signals and output data for execution stage are valid
-	output logic dmem_load_bypass_o, 			///< Bypass to execution stage - start read transfer
-	output logic exe_first_cycle_o, 			///< First cycle signal for execution stage
-	output logic fetch_stall_for_jmp_target_o,
-	output logic inst_jmp_or_branch_o,
-	output logic ready_for_interrupt_o,
+	output logic valid_o, 						///< Control signals and output data for EXE stage are valid
+	output logic dmem_load_bypass_o, 			///< Bypass to EXE stage - start read transfer
+	output logic exe_first_cycle_o, 			///< First cycle signal for EXE stage
+	output logic fetch_stall_for_jmp_target_o,	///< Asserted when the IF stage should pause fetching, until the 
+												///  correct jump target is outputed.
+	output logic inst_jmp_or_branch_o,			///< Asserted when the currently executing instrucion is a jump 
+												///  or a branch.
+												
+	output logic ready_for_interrupt_o,			///< Asserted when the ID is ready to recieve an interrupt.
 
 	// --------- Output Data  -----------
 	output logic [31:0] lsu_store_addr_o, 		///< Store address for LSU - FF
-	output logic [31:0] lsu_load_addr_bypass_o, ///< Bypass to execution stage - Load address for LSU - Combinatorical
+	output logic [31:0] lsu_load_addr_bypass_o, ///< Bypass to EXE stage - Load address for LSU - Combinatorical
 	output logic [31:0] jmp_target_o, 			///< Jump target for IF stage.
-	output logic [15:0] alu_b_o, 				///< ALU input b data for execution stage.
-	output logic [15:0] wb_o, 					///< WB data fro execution stage.
+	output logic [15:0] alu_b_o, 				///< ALU input b data register for EXE stage.
+	output logic [15:0] wb_o, 					///< WB data from EXE stage.
 	output logic [4:0] rd_o, 					///< Register file write port index.
 	output logic [4:0] rs32_o, 					///< Register file 32 bit read port index.
 	output logic [4:0] rs16_o, 					///< Register file 16 bit read port index.
 	output logic inst31_o, 					///< Register file 16 bit read port index.
 
-	output logic [11:0] csr_addr_o,
-	output logic [31:0] pc_o
+	output logic [11:0] csr_addr_o,				///< CSR Address register for EXE stage.
+	output logic [31:0] pc_o					///< Program counter of currently decoded instruction
 );
 
 // ===============================

@@ -26,48 +26,42 @@ module interrupt_sbm (
 );
 
 logic interrupt;
+logic [4:0] cause;
+
+localparam bit [4:0] CAUSE_MEI = 5'd11;
+localparam bit [4:0] CAUSE_AES = 5'd16;
+
+always_comb begin
+	cause = 5'b0;
+	interrupt = 1'b0;
+	if (mstatus_mie_i) begin
+		if ((mip_i[11] && mie_i[11])) begin
+			cause = CAUSE_MEI;
+			interrupt = 1'b1;
+		end else if ((mip_i[16] && mie_i[16])) begin
+			cause = CAUSE_AES;
+			interrupt = 1'b1;
+		end
+	end
+end
 
 always_comb begin
 	mepc_write_o = 1'b0;
-	mcause_write_o = 1'b0;
-
 	mepc_write_data_o = 32'b0;
+	mcause_write_o = 1'b0;
 	mcause_write_data_o = 32'b0;
-
+	interrupt_o = 1'b0;
+	interrupt_jmp_target_o = 32'b0;
 	store_clear_mstatus_mie_o = 1'b0;
 
-
-	interrupt = 1'b0;
-	if (mstatus_mie_i) begin
-		if ((mip_i[16] && mie_i[16])) begin
-			if (mstatus_mie_i && mie_i[16]) begin
-				mepc_write_o = dec_ready_for_interrupt_i;
-				mepc_write_data_o = dec_inst_jmp_or_branch_i ? dec_pc_i : fetch_pc_current_i;
-
-				mcause_write_o = dec_ready_for_interrupt_i;
-				mcause_write_data_o = {1'b1, 31'd16};
-
-				interrupt = 1'b1;
-			end
-		end
-
-		//! Make sure the difference is only in the cause code
-		if ((mip_i[11] && mie_i[11])) begin
-			if (mstatus_mie_i && mie_i[11]) begin
-				mepc_write_o = dec_ready_for_interrupt_i;
-				mepc_write_data_o = dec_inst_jmp_or_branch_i ? dec_pc_i : fetch_pc_current_i;
-
-				mcause_write_o = dec_ready_for_interrupt_i;
-				mcause_write_data_o = {1'b1, 31'd11};
-
-				interrupt = 1'b1;
-			end 
-		end
+	if (interrupt && dec_ready_for_interrupt_i) begin
+		mepc_write_o = 1'b1;
+		mepc_write_data_o = dec_inst_jmp_or_branch_i ? dec_pc_i : fetch_pc_current_i;
+		mcause_write_o = 1'b1;
+		mcause_write_data_o = {1'b1, 26'b0, cause};
+		interrupt_o = 1'b1;
+		interrupt_jmp_target_o = mtvec_i;
+		store_clear_mstatus_mie_o = 1'b1;
 	end
-
-	interrupt_o = (dec_ready_for_interrupt_i ? interrupt : 1'b0 );
-	interrupt_jmp_target_o = interrupt_o ? mtvec_i : 32'b0;
-	store_clear_mstatus_mie_o = interrupt_o;
 end
-
 endmodule 

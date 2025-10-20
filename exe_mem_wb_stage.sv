@@ -15,7 +15,7 @@ module exe_mem_wb_stage #(
 	input cs_exe_s cs_i, 						///< Control signals
 	
 	input logic interrupt_req_ext_i, 			///< Bypass from ID stage - Start early load if possible
-	input logic dec_ready_for_interrupt_i,
+	input logic dec_ready_for_interrupt_i,		///< Indicates whether ID stage can be interrupted
 
 	//--
 	apb_if.master dmem_apb, 					///< DMEM APB Interface
@@ -29,15 +29,17 @@ module exe_mem_wb_stage #(
 	input logic [4:0] rd_i, 					///< Register file write port index
 	input logic [4:0] rs32_i, 					///< Register file 32 bit read port index
 	input logic [4:0] rs16_i, 					///< Register file 16 bit read port index
-	input logic [11:0] csr_addr_i, 				
-	input logic [31:0] fetch_pc_current_i,
-	input logic [31:0] dec_pc_i,
-	input logic dec_inst_jmp_or_branch_i,
+	input logic [11:0] csr_addr_i, 				///< CSR Address
+	input logic [31:0] fetch_pc_current_i, 		///< PC of currently fetched instruction in IF stage
+	input logic [31:0] dec_pc_i,				///< PC of currently decoded instruction in ID stage
+	input logic dec_inst_jmp_or_branch_i,		///< Indicates whether the currently decoded instrucion in ID stage
+												///  is a jump or a branch.
 
 	// --------- Output Controls --------
 	output logic ready_o, 						///< Execution stage ready for new controls and data
-	output logic dmem_apb_ready_d_o, 						///< Execution stage ready for new controls and data
-	output logic interrupt_o,
+	output logic dmem_apb_ready_d_o, 			///< Indicates whether the dmem APB interface was 
+												///  ready at the end of the last cycle.
+	output logic interrupt_o,					///< Triggers an interrupt when asserted
 
 	// --------- Output Data --------- 
 	output logic [31:0] reg32_o, 				///< Register file 32 bit read port data
@@ -47,8 +49,8 @@ module exe_mem_wb_stage #(
 	`endif
 	output logic cmp_result_valid_o, 			///< Comperator result is valid for IF stage
 	output logic shift_bigger_then_16_o, 		///< Signal ID to not forward lower half.
-	output logic [31:0] interrupt_jmp_target_o,
-	output logic [31:0] mepc_o
+	output logic [31:0] interrupt_jmp_target_o, ///< Interrupt jump target
+	output logic [31:0] mepc_o 					///< CSR MEPC data
 
 );
 
@@ -239,7 +241,7 @@ csr_sbm csr (
 	.restore_mstatus_mie_i(restore_mstatus_mie),
 
 	.valid_o(csr_valid),
-	.read_data_o(csr_read_data_out), //! Continue connecting and check if dec changes harm
+	.read_data_o(csr_read_data_out), 
 
 	.mstatus_mie_o(csr_mstatus_mie),
 	.mepc_o(csr_mepc),

@@ -14,7 +14,7 @@ module fetch_unit # (
 	input logic branch_i,			 		///< Valid branch decoded in ID stage
 	input logic ready_i, 					///< Downstream stage can accept inst
 	input logic branch_cmp_result_valid_i,  ///< Comperator result valid
-	input logic stall_for_jmp_target_i,  
+	input logic stall_for_jmp_target_i,     ///< Stall fetching when asserted
 
 	//--
 	apb_if.master imem_apb, 				///< IMEM APB Interface
@@ -30,9 +30,9 @@ module fetch_unit # (
 	output logic misspredict_o, 		 	///< Indicate misspredicted branch and thus last outputed instruction is invalid
 
 	// --------- Output Data --------
-	output logic [31:0] inst_o, 			///< Output instruction
-	output logic [31:0] pc_o, 				///< Output PC of instruction
-	output logic [31:0] pc_current_o 				///< Output PC of instruction
+	output logic [31:0] inst_o, 			///< Output fetched instruction
+	output logic [31:0] pc_o, 				///< Output PC of fetched instruction
+	output logic [31:0] pc_current_o 		///< Output PC of currently fetched instruction
 );
 
 
