@@ -238,9 +238,17 @@ always_comb begin
 			end
 		end
 		ALU_OP_SRL: begin
-			if (shift_bigger_then_16 && first_cycle) begin
-				shift_in = 16'b0;
-				result_o = 16'b0;
+			if (shift_bigger_then_16) begin
+				if (first_cycle) begin
+					shift_in = 16'b0;
+					result_o = 16'b0;
+					shift_in = a_i;
+				end else begin
+					shift_in = shift_in_d;
+					shift_filler_in = shift_out;
+					shift_filler_fill = shift_in_d;
+					result_o = shift_filler_out;
+				end
 			end else begin
 				shift_in = a_i;
 				if (first_cycle) begin
@@ -253,9 +261,17 @@ always_comb begin
 			end
 		end
 		ALU_OP_SRA: begin
-			if (shift_bigger_then_16 && first_cycle) begin
-				shift_in = {16{a_i[15]}};
-				result_o = {16{a_i[15]}};
+			if (shift_bigger_then_16) begin
+				if (first_cycle) begin
+					shift_in = {16{a_i[15]}};
+					result_o = {16{a_i[15]}};
+					shift_in = a_i;
+				end else begin
+					shift_in = shift_in_d;
+					shift_filler_in = shift_out;
+					shift_filler_fill = shift_in_d;
+					result_o = shift_filler_out;
+				end
 			end else begin
 				shift_in = a_i;
 				if (first_cycle) begin
@@ -270,9 +286,19 @@ always_comb begin
 			end
 		end
 		ALU_OP_SLL: begin
-			if (shift_bigger_then_16 && first_cycle) begin
-				shift_in = 16'b0;
-				result_o = 16'b0;
+			if (shift_bigger_then_16) begin
+				if (first_cycle) begin
+					shift_in = 16'b0;
+					result_o = 16'b0;
+					shift_in = a_i;
+				end else begin
+					reverse_a_in = shift_in_d;
+					shift_in = reverse_a_out;
+					shift_filler_in = shift_out;
+					shift_filler_fill = shift_in_d;
+					reverse_b_in = shift_filler_out;
+					result_o = reverse_b_out;
+				end
 			end else begin
 				reverse_a_in = a_i;
 				shift_in = reverse_a_out;

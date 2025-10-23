@@ -7,7 +7,7 @@ $CROSS-gcc -march=rv32i_zicsr -mabi=ilp32 -ffreestanding \
   -nostartfiles -ffunction-sections -fdata-sections \
   -Wl,-T,linker.ld -Wl,--gc-sections -Wl,-Map=hello.map \
   -specs=nano.specs \
-  csr.S trap.S crt0.S syscalls.c trap.c $FILENAME -o hello.elf -lgcc -lc
+  csr.S trap.S crt0.S syscalls.c trap.c accel.c aes_software.c $FILENAME -o hello.elf -lgcc -lc
 
 riscv64-unknown-elf-objcopy -O binary \
   --only-section .init --only-section .text \

@@ -51,6 +51,7 @@ logic [31:0] pc_next;
 logic [31:0] jmp_target_requested;
 
 logic take_branch;
+logic in_speculative_state;
 
 // ===============================
 //			Internal Registers        
@@ -261,9 +262,10 @@ end
 //		Combinatorical Logic
 // ===============================
 
+assign in_speculative_state = state_e inside {ST_INIT_FETCH_SPEC, ST_FETCH_SPEC, ST_FULL_BUFFER_SPEC};
 assign pc_next = pc_current + 4;
 assign inst_in_buffer_branch_jmp = (inst_buffer[6:0] inside {OPC_BRANCH, OPC_JAL, OPC_JALR});
-assign misspredict_o = branch_cmp_result_valid_i && (branch_taken != branch_cmp_result_i);
+assign misspredict_o = in_speculative_state && (branch_cmp_result_valid_i && (branch_taken != branch_cmp_result_i));
 assign pc_current_o = pc_current;
 always_comb begin
 	case (state_e)

@@ -16,6 +16,7 @@ module exe_mem_wb_stage #(
 	
 	input logic interrupt_req_ext_i, 			///< Bypass from ID stage - Start early load if possible
 	input logic dec_ready_for_interrupt_i,		///< Indicates whether ID stage can be interrupted
+	input logic accel_rf_write_i,		///< Indicates whether ID stage can be interrupted
 
 	//--
 	apb_if.master dmem_apb, 					///< DMEM APB Interface
@@ -89,7 +90,6 @@ logic [15:0] regfile_write_data;
 logic accel_load_key;
 logic accel_start_enc;
 logic accel_start_dec;
-logic accel_rf_write_en;
 logic [127:0] accel_data_in;
 logic [127:0] accel_data_out;
 logic accel_ready;
@@ -188,7 +188,7 @@ regfile_sbm regfile (
 	.rs16_i(rs16_i),
 	.rd_i(rd_i),
 	.write_i(regfile_write_en),
-	.accel_write_en_i(accel_rf_write_en),
+	.accel_write_en_i(accel_rf_write_i),
 	.write_data_i(regfile_write_data),
 	.rd_h_sel_i(rd_h_sel),
 	.rs16_h_sel_i(rs16_h_sel),
@@ -215,7 +215,7 @@ aes128_core accel (
 
 	.data_o(accel_data_out),
 	.ready_o(accel_ready),
-	.done_o(accel_rf_write_en)
+	.done_o(accel_done)
 );
 
 csr_sbm csr (

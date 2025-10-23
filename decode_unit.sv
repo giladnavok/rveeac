@@ -37,6 +37,7 @@ module decode_unit (
 	output logic resume_execution_from_dec_inst_o,			
 												
 	output logic ready_for_interrupt_o,			///< Asserted when the ID is ready to recieve an interrupt.
+	output logic accel_rf_write_o,			
 
 	// --------- Output Data  -----------
 	output logic [31:0] lsu_store_addr_o, 		///< Store address for LSU - FF
@@ -396,6 +397,7 @@ always_comb begin
 	dmem_load_bypass_o = 1'b0;
 	rs32_o = cs.dec.en.reg32_use ? ((cs.dec.en.lsu_addr || cs.dec.en.dmem_load_bypass || cs.dec.en.jmp) ? rs1 : rs2) : rs32_d;
 	fetch_stall_for_jmp_target_o = cs.dec.en.jmp && full_read_after_write && !issue;
+	accel_rf_write_o = 1'b0;
 	case (state_e)
 		ST_ISSUE_FIRST: begin
 			if (!(interrupt_i && inst_jmp_or_branch)) begin
@@ -410,7 +412,7 @@ always_comb begin
 						end else begin
 							valid_o = 1'b1;
 							dmem_load_bypass_o = cs.dec.en.dmem_load_bypass;
-							lsu_load_addr_bypass_o = cs.dec.en.dmem_load_bypass ? jmp_target : '0;
+							lsu_load_addr_bypass_o = cs.dec.en.dmem_load_bypass ? add_out : '0;
 						end
 					end else begin
 						valid_o = 1'b1;
@@ -445,6 +447,7 @@ always_comb begin
 			end
 			if (cs.dec.en.wait_for_accel && accel_ready_i) begin
 				ready_o = valid_i;
+				accel_rf_write_o = 1'b1;
 			end
 		end
 	endcase

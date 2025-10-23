@@ -42,6 +42,7 @@ logic dec_inst31_out;
 logic dec_stall_for_jmp_target;
 logic dec_resume_execution_from_dec_inst;
 logic dec_ready_for_interrupt;
+logic dec_accel_rf_write;
 logic [31:0] dec_pc;
 
 logic exe_ready;
@@ -131,6 +132,7 @@ decode_unit decode (
 	.fetch_stall_for_jmp_target_o(dec_stall_for_jmp_target),
 	.resume_execution_from_dec_inst_o(dec_resume_execution_from_dec_inst),
 	.ready_for_interrupt_o(dec_ready_for_interrupt),
+	.accel_rf_write_o(dec_accel_rf_write),
 
 	.lsu_store_addr_o(dec_lsu_store_addr_out),
 	.lsu_load_addr_bypass_o(dec_lsu_load_addr_bypass),
@@ -156,6 +158,7 @@ exe_mem_wb_stage exe_mem_wb (
 
 	.interrupt_req_ext_i(interrupt_req_ext_i),
 	.dec_ready_for_interrupt_i(dec_ready_for_interrupt),
+	.accel_rf_write_i(dec_accel_rf_write),
 
 	.dmem_apb(dmem_apb),
 
