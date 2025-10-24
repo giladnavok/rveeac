@@ -119,7 +119,7 @@ end
 
 always begin
 	#400000;
-	trigger_interrupt_req_ext = 1'b0;
+	trigger_interrupt_req_ext = 1'b1;
 	#4 trigger_interrupt_req_ext = 1'b0;
 end
 

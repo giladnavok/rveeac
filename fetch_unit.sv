@@ -148,7 +148,7 @@ always_ff @(posedge clk or negedge rst_n) begin
 				jmp_requested <= 1'b0;
 			end
 			ST_INIT_FETCH_SPEC: begin
-				if (branch_cmp_result_valid_i & (branch_taken != branch_cmp_result_i)) begin
+				if (branch_cmp_result_valid_i && (branch_taken != branch_cmp_result_i)) begin
 					pc_current <= imem_apb_fetch_address;
 					state_e <= ST_FETCH;
 				end else if (branch_cmp_result_valid_i) begin
@@ -186,14 +186,18 @@ always_ff @(posedge clk or negedge rst_n) begin
 					jmp_target_requested <= jmp_target_i;
 					state_e <= ST_FETCH_DISCARD;
 				end else if (imem_apb_valid) begin
+					if (branch_i) begin
+						branch_taken <= 1'b0;
+						branch_alternative <= jmp_target_i;
+					end
 					if (ready_i) begin
 						pc_current <= pc_next;
-						// state_e <= branch_i ? ST_INIT_FETCH_SPEC : ST_INIT_FETCH;
-						state_e <= ST_INIT_FETCH;
+						state_e <= branch_i ? ST_INIT_FETCH_SPEC : ST_INIT_FETCH;
+						//state_e <= ST_INIT_FETCH;
 					end else begin
 						inst_buffer <= imem_apb_rdata;
-						//state_e <= branch_i ? ST_FULL_BUFFER_SPEC : ST_FULL_BUFFER;
-						state_e <= ST_FULL_BUFFER;
+						state_e <= branch_i ? ST_FULL_BUFFER_SPEC : ST_FULL_BUFFER;
+						//state_e <= ST_FULL_BUFFER;
 					end
 				end 
 			end
@@ -340,7 +344,7 @@ always_comb begin
 			imem_apb_fetch_address = pc_current;
 		end
 		default: begin // ST_FETCH / ST_FETCH_SPEC
-			valid_o = imem_apb_valid && !(jmp_i || (branch_i && take_branch) || misspredict_o);
+			valid_o = imem_apb_valid && !(jmp_i || misspredict_o);
 			inst_o = imem_apb_rdata;
 			pc_o = pc_current;
 			imem_apb_start = 1'b0;
