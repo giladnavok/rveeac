@@ -21,7 +21,7 @@ logic fetch_valid;
 logic [31:0] fetch_pc_out;
 logic [31:0] fetch_inst_out;
 logic fetch_misspredict;
-logic [31:0] fetch_pc_current;
+logic [31:0] fetch_pc_next;
 
 logic dec_ready;
 logic dec_valid;
@@ -91,6 +91,7 @@ fetch_unit fetch (
 	.branch_cmp_result_valid_i(exe_cmp_result_valid),
 	.inst31_i(dec_inst31_out),
 	.stall_for_jmp_target_i(dec_stall_for_jmp_target),
+	.interrupt_i(exe_interrupt),
 
 	.imem_apb(imem_apb),
 
@@ -102,7 +103,7 @@ fetch_unit fetch (
 
 	.pc_o(fetch_pc_out),
 	.inst_o(fetch_inst_out),
-	.pc_current_o(fetch_pc_current)
+	.pc_next_o(fetch_pc_next)
 );
 
 decode_unit decode (
@@ -170,7 +171,7 @@ exe_mem_wb_stage exe_mem_wb (
 	.rs32_i(dec_rs32_out),
 	.rs16_i(dec_rs16_out),
 	.csr_addr_i(dec_csr_addr_out),
-	.fetch_pc_current_i(fetch_pc_current),
+	.fetch_pc_next_i(fetch_pc_next),
 	.dec_pc_i(dec_pc),
 	.dec_resume_execution_from_dec_inst_i(dec_resume_execution_from_dec_inst),
 

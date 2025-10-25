@@ -4,6 +4,7 @@
 #include <reent.h>
 #include <stdlib.h>
 #include <string.h>
+#include "syscalls.h"
 
 const int A[] = {1, 2, 3, 4};
 int B[] = {1, 2, 3, 4};
@@ -45,6 +46,7 @@ int test() {
 	res += (C[1] == 2);
 	res += (C[2] == 3);
 	res += (C[3] == 4);
+
 	printf((res == 8)? "SUCCESS\n" : "FAILED\n");
 }
 

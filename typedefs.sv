@@ -313,6 +313,12 @@ package typedefs;
 			csr_req: DISABLE,
 			csr_restore_mstatus_mie: DISABLE
 		};
+
+	typedef struct packed {
+		logic [31:0] inst;
+		logic [31:0] pc;
+		logic valid;
+	} prefetch_entry_s;
 endpackage
 
 interface apb_if;

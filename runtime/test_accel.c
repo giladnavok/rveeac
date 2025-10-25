@@ -41,12 +41,17 @@ int main() {
 		aes128_encrypt_block_hardware(ct_hardware, pt);
 		aes128_encrypt_block_software(ct_software, pt, key);
 
+		print_chars(ct_hardware);
+		print_chars(ct_software);
 		assert(test_equal(ct_hardware, ct_software));
 
 		aes128_decrypt_block_hardware(pt_recon_hardware, ct_hardware);
 		aes128_decrypt_block_software(pt_recon_software, ct_software, key);
 
+		print_chars(pt_recon_hardware);
+		print_chars(pt_recon_software);
 		assert(test_equal(pt_recon_hardware, pt_recon_software));
+		printf("Done round %d\n", i);
 	}
 
 	printf("passed\n");

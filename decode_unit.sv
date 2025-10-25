@@ -72,6 +72,8 @@ logic issue;
 logic signal_jmp_issue_first;
 logic signal_jmp_wait_fetch_or_interrupt;
 
+logic signal_branch_issue_first;
+
 logic inst_jmp_or_branch;
 
 logic [31:0] jmp_target;
@@ -107,6 +109,7 @@ logic valid_i_d;
 logic stall_one_cycle_d;
 logic state_e_d;
 logic signaled_jmp;
+logic signaled_branch;
 
 logic valid_o_d;
 
@@ -218,15 +221,22 @@ always_ff @(posedge clk or negedge rst_n) begin
 	end
 end
 
-// Sample signaled_jmp
+// Sample signaled_jmp and signaled_branch
 
 always_ff @(posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		signaled_jmp <= 1'b0;
+		signaled_branch <= 1'b0;
 	end else begin
 		case (state_e) 
-			ST_ISSUE_FIRST: signaled_jmp <= signal_jmp_issue_first;
-			ST_ISSUE_SECOND: signaled_jmp <= 1'b0;
+			ST_ISSUE_FIRST: begin
+				signaled_jmp <= signal_jmp_issue_first;
+				signaled_branch <= signal_branch_issue_first;
+			end
+			ST_ISSUE_SECOND: begin
+				signaled_jmp <= 1'b0;
+				signaled_branch <= 1'b0;
+			end
 			ST_WAIT_FETCH, ST_WAIT_FOR: signaled_jmp <= !valid_i && signal_jmp_wait_fetch_or_interrupt;
 		endcase
 	end
@@ -357,6 +367,10 @@ assign signal_jmp_issue_first =
 	(state_e == ST_ISSUE_FIRST) && 
 	(interrupt_i || (fetch_stall_for_jmp_target_o ? 1'b0 : cs.dec.en.jmp));
 
+assign signal_branch_issue_first = 
+	(state_e == ST_ISSUE_FIRST) && 
+	(cs.dec.en.branch);
+
 assign signal_jmp_wait_fetch_or_interrupt = 
 	(state_e inside {ST_WAIT_FETCH, ST_WAIT_FOR}) && 
 	(interrupt_i);
@@ -381,7 +395,8 @@ assign rs2 = inst[24:20];
 // --------------------- //
 assign first_cycle = (state_e == ST_ISSUE_FIRST);
 assign issue = (((state_e == ST_ISSUE_FIRST) && ready_i && !cs.dec.en.wait_for_interrupt && !stall_one_cycle) || (state_e ==  ST_ISSUE_SECOND)) && !misspredict_i;
-assign jmp_o = signaled_jmp ? 1'b0 : (signal_jmp_issue_first || signal_jmp_wait_fetch_or_interrupt);
+assign jmp_o = !signaled_jmp && (signal_jmp_issue_first || signal_jmp_wait_fetch_or_interrupt);
+assign branch_o = !signaled_branch && signal_branch_issue_first;
 
 assign inst_jmp_or_branch = (opcode inside {OPC_BRANCH, OPC_JAL, OPC_JALR});
 assign resume_execution_from_dec_inst_o = inst_jmp_or_branch || cs.dec.en.wait_for_accel;
@@ -391,20 +406,23 @@ always_comb begin
 	inst31_o = inst[31];
 	valid_o = 1'b0;
 	ready_o = 1'b0;
-	branch_o = 1'b0;
 	jmp_target_o = '0;
 	lsu_load_addr_bypass_o = '0;
 	dmem_load_bypass_o = 1'b0;
 	rs32_o = cs.dec.en.reg32_use ? ((cs.dec.en.lsu_addr || cs.dec.en.dmem_load_bypass || cs.dec.en.jmp) ? rs1 : rs2) : rs32_d;
 	fetch_stall_for_jmp_target_o = cs.dec.en.jmp && full_read_after_write && !issue;
 	accel_rf_write_o = 1'b0;
+	jmp_target_o = '0;
+
+	if (cs.dec.en.branch) begin
+		jmp_target_o = jmp_target;
+	end else if (cs.dec.en.jmp && !fetch_stall_for_jmp_target_o) begin
+		jmp_target_o = jmp_target;
+	end
+
 	case (state_e)
 		ST_ISSUE_FIRST: begin
 			if (!(interrupt_i && inst_jmp_or_branch)) begin
-				if (ready_i || !stall_one_cycle || !fetch_stall_for_jmp_target_o) begin
-					branch_o = cs.dec.en.branch;
-					jmp_target_o = (cs.dec.en.jmp || cs.dec.en.branch) ? jmp_target : '0;
-				end
 				if (ready_i) begin
 					if (!stall_one_cycle) begin
 						if (misspredict_i) begin

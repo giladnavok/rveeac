@@ -31,7 +31,7 @@ module exe_mem_wb_stage #(
 	input logic [4:0] rs32_i, 					///< Register file 32 bit read port index
 	input logic [4:0] rs16_i, 					///< Register file 16 bit read port index
 	input logic [11:0] csr_addr_i, 				///< CSR Address
-	input logic [31:0] fetch_pc_current_i, 		///< PC of currently fetched instruction in IF stage
+	input logic [31:0] fetch_pc_next_i, 		///< PC of currently fetched instruction in IF stage
 	input logic [31:0] dec_pc_i,				///< PC of currently decoded instruction in ID stage
 	input logic dec_resume_execution_from_dec_inst_i,	
 
@@ -254,7 +254,7 @@ interrupt_sbm interrupt (
 	.clk(clk),
 	.rst_n(rst_n),
 
-	.fetch_pc_current_i(fetch_pc_current_i),
+	.fetch_pc_next_i(fetch_pc_next_i),
 	.dec_pc_i(dec_pc_i),
 	.dec_resume_execution_from_dec_inst_i(dec_resume_execution_from_dec_inst_i),
 	.dec_ready_for_interrupt_i(dec_ready_for_interrupt_i),
