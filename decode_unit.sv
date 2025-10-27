@@ -43,6 +43,7 @@ module decode_unit (
 	output logic [31:0] lsu_store_addr_o, 		///< Store address for LSU - FF
 	output logic [31:0] lsu_load_addr_bypass_o, ///< Bypass to EXE stage - Load address for LSU - Combinatorical
 	output logic [31:0] jmp_target_o, 			///< Jump target for IF stage.
+	output logic [15:0] alu_a_o, 				///< ALU input a data register for EXE stage.
 	output logic [15:0] alu_b_o, 				///< ALU input b data register for EXE stage.
 	output logic [15:0] wb_o, 					///< WB data from EXE stage.
 	output logic [4:0] rd_o, 					///< Register file write port index.
@@ -107,8 +108,10 @@ logic [4:0] rs32_d;
 logic ready_i_d;
 logic valid_i_d;
 logic stall_one_cycle_d;
+logic rs16_half_order_flip_d;
 logic signaled_jmp;
 logic signaled_branch;
+logic [31:0] reg32_i_d;
 
 logic valid_o_d;
 
@@ -212,11 +215,17 @@ always_ff @(posedge clk or negedge rst_n) begin
 		valid_i_d <= 1'b0;
 		rs32_d <= 5'b0;
 		valid_o_d <= 1'b0;
+		rs16_half_order_flip_d <= '0;
+		reg32_i_d <= '0;
 	end else begin
 		state_e_d <= state_e;
 		stall_one_cycle_d <= stall_one_cycle;
 		rs32_d <= rs32_o;
 		valid_o_d <= valid_o;
+		rs16_half_order_flip_d <= cs.dec.en.rs16_half_order_flip;
+		if (first_cycle) begin
+			reg32_i_d <= reg32_i;
+		end
 	end
 end
 
@@ -244,6 +253,7 @@ end
 
 // Output Sequential //
 // ----------------- //
+
 
 always_ff @(posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
@@ -295,7 +305,7 @@ end
 // Adder Logic  //
 // ------------ //
 assign add_b = imm;
-assign add_a = (cs.dec.sel.add_sel == DEC_ADD_SEL_PC) ? pc : reg32_i;
+assign add_a = (cs.dec.sel.add_sel == DEC_ADD_SEL_PC) ? pc : (first_cycle? reg32_i : reg32_i_d);
 assign add_out = add_a + add_b;
 
 
@@ -310,7 +320,7 @@ assign serializer_out = (serializer_en && forward_lower_half) ?
 always_comb begin
 	case (cs.dec.sel.alu_wb_sel)
 		ALU_WB_SEL_IMM: serializer_in = imm;
-		ALU_WB_SEL_REG: serializer_in = reg32_i;
+		ALU_WB_SEL_REG: serializer_in = first_cycle ? reg32_i : reg32_i_d;
 		ALU_WB_SEL_PC: serializer_in = pc;
 		ALU_WB_SEL_ADDER: serializer_in = add_out;
 	endcase
@@ -402,6 +412,35 @@ assign inst_jmp_or_branch = (opcode inside {OPC_BRANCH, OPC_JAL, OPC_JALR});
 assign resume_execution_from_dec_inst_o = inst_jmp_or_branch || cs.dec.en.wait_for_accel;
 assign ready_for_interrupt_o = (state_e != ST_ISSUE_SECOND);
 assign pc_o = pc;
+
+logic [15:0] second_half_alu_a;
+always_ff @(posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		second_half_alu_a <= '0;
+	end else begin
+		if (issue && !first_cycle) begin
+			if (!cs.dec.en.rs16_half_order_flip) begin
+				second_half_alu_a <= reg32_i[31:16];
+			end else begin
+				second_half_alu_a <= reg32_i[15:0];
+			end
+		end
+	end
+
+end
+always_comb begin
+	alu_a_o = '0;
+	if (state_e_d == ST_ISSUE_SECOND) begin
+		alu_a_o = second_half_alu_a;
+	end else begin
+		if (!rs16_half_order_flip_d) begin
+			alu_a_o = reg32_i[15:0];
+		end else begin
+			alu_a_o = reg32_i[31:16];
+		end
+	end
+end
+
 always_comb begin
 	inst31_o = inst[31];
 	valid_o = 1'b0;
@@ -449,7 +488,7 @@ always_comb begin
 			valid_o = valid_o_d;
 			ready_o = 1'b1;
 			if (valid_o_d) begin
-				rs32_o = cs.exe.en.dmem_store ? rs2 : rs32_o;
+				rs32_o = cs.exe.en.dmem_store ? rs2 : rs1;
 			end
 		end
 		ST_WAIT_FETCH: begin

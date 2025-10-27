@@ -17,11 +17,11 @@ def aes128_decrypt_block(cipher_text_block: bytes, key: bytes) -> bytes:
 
 def main():
     # 128-bit (16-byte) constant key
-    key = bytes.fromhex('2b7e151628aed2a6abf7158809cf4f3c')
+    key = "1aaaaaaaaaaaaaaa".encode() # bytes.fromhex('2b7e151628aed2a6abf7158809cf4f3c')
     # 128-bit plaintext block
-    plaintext = bytes.fromhex('3243f6a8885a308d313198a2e0370711')
+    plaintext = ("e" * 16 ). encode() #bytes.fromhex('3243f6a8885a308d313198a2e0370711')
 
-    ciphertext = aes128_decrypt_block(plaintext, key)
+    ciphertext = aes128_encrypt_block(plaintext, key)
     plaintext_recon = aes128_decrypt_block(ciphertext, key)
     
     print("Key              :", key.hex())

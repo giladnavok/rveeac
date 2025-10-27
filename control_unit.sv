@@ -157,12 +157,12 @@ always_comb begin
 				FNC3_BLT, FNC3_BGE: begin
 					cs_o.exe.sel.alu_op = ALU_OP_LT;
 					cs_o.dec.sel.ser_start = SER_START_UH;
-					cs_o.exe.en.rs16_half_order_flip = ENABLE;
+					cs_o.dec.en.rs16_half_order_flip = ENABLE;
 				end
 				FNC3_BLTU, FNC3_BGEU: begin
 					cs_o.exe.sel.alu_op = ALU_OP_LTU;
 					cs_o.dec.sel.ser_start = SER_START_UH;
-					cs_o.exe.en.rs16_half_order_flip = ENABLE;
+					cs_o.dec.en.rs16_half_order_flip = ENABLE;
 				end
 			endcase
 		end
@@ -263,13 +263,13 @@ always_comb begin
 					cs_o.exe.sel.alu_op = ALU_OP_LT;
 					cs_o.exe.en.wb_order_flip = ENABLE;
 					cs_o.dec.sel.ser_start = SER_START_UH;
-					cs_o.exe.en.rs16_half_order_flip = ENABLE;
+					cs_o.dec.en.rs16_half_order_flip = ENABLE;
 				end
 				FNC3_OP_SLTU: begin  
 					cs_o.exe.sel.alu_op = ALU_OP_LTU;
 					cs_o.exe.en.wb_order_flip = ENABLE;
 					cs_o.dec.sel.ser_start = SER_START_UH;
-					cs_o.exe.en.rs16_half_order_flip = ENABLE;
+					cs_o.dec.en.rs16_half_order_flip = ENABLE;
 				end
 				FNC3_OP_XOR: begin  
 					cs_o.exe.sel.alu_op = ALU_OP_XOR;
@@ -287,7 +287,7 @@ always_comb begin
 				FNC3_OP_SRL_SRA: begin  
 					cs_o.exe.sel.alu_op = funct7_i[5] ?
 					   	ALU_OP_SRA : ALU_OP_SRL;
-					cs_o.exe.en.rs16_half_order_flip = ENABLE;
+					cs_o.dec.en.rs16_half_order_flip = ENABLE;
 					cs_o.exe.en.wb_order_flip = ENABLE;
 					cs_o.dec.en.forward_just_one_half = ENABLE;
 				end

@@ -25,6 +25,7 @@ module exe_mem_wb_stage #(
 		
 	input logic [31:0] lsu_store_addr_i, 		///< Store addres
 	input logic [31:0] load_addr_bypass_i, 		///< Bypass from ID Stage - early load address
+	input logic [15:0] alu_a_i, 				///< ALU b data from ID stage
 	input logic [15:0] alu_b_i, 				///< ALU b data from ID stage
 	input logic [15:0] wb_i, 					///< WB data from ID stage
 	input logic [4:0] rd_i, 					///< Register file write port index
@@ -309,7 +310,7 @@ end
 // ALU A Mux
 always_comb begin
 	case (cs_i.sel.alu_a)
-		ALU_A_SEL_REG: alu_a = reg16_data;
+		ALU_A_SEL_REG: alu_a = alu_a_i;
 		ALU_A_SEL_CSR_IMM: alu_a = csr_imm_ext;
 	endcase
 end
@@ -332,7 +333,7 @@ always_comb begin
 end
 
 assign transfer_start = load_store_apb_ready && ((valid_i && (first_cycle && cs_i.en.dmem_store)) || dmem_load_bypass_i);
-assign rs16_h_sel = cs_i.en.reg16_use && (!first_cycle && !shift_bigger_then_16_o) ^ cs_i.en.rs16_half_order_flip;
+assign rs16_h_sel = cs_i.en.reg16_use && (!first_cycle && !shift_bigger_then_16_o);
 assign lsu_addr = (cs_i.en.dmem_store && !dmem_load_bypass_i) ? lsu_store_addr_i : load_addr_bypass_i;
 assign load_store_write = cs_i.en.dmem_store && !dmem_load_bypass_i;
 
