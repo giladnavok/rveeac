@@ -33,7 +33,7 @@ void reset() {
 
 void test1() {
 	for (int i = 2; i < N; i*=2) {
-		assert((i/2)-1 == read_write_mscratch(i-1));
+		assert(((i/2)-1) == read_write_mscratch(i-1));
 		printf(".");
 	}
 	printf(" Done 1\n");
