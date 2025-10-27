@@ -107,7 +107,6 @@ logic [4:0] rs32_d;
 logic ready_i_d;
 logic valid_i_d;
 logic stall_one_cycle_d;
-logic state_e_d;
 logic signaled_jmp;
 logic signaled_branch;
 
@@ -154,7 +153,7 @@ imm_gen_sbm imm_gen (
 // 	 				  otherwise switch to ST_WAIT_FETCH to wait for IF.
 // * ST_WAIT_FETCH: Wait for IF stage to finish fetching.
 
-enum logic [1:0] {ST_ISSUE_FIRST, ST_ISSUE_SECOND, ST_WAIT_FETCH, ST_WAIT_FOR} state_e;
+enum logic [1:0] {ST_ISSUE_FIRST, ST_ISSUE_SECOND, ST_WAIT_FETCH, ST_WAIT_FOR} state_e, state_e_d;
 
 localparam logic [31:0] NOP = 32'h00000013;
 always_ff @(posedge clk or negedge rst_n) begin
@@ -207,7 +206,7 @@ end
 // Sample delayed signals
 always_ff @(posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
-		state_e_d <= '0;
+		state_e_d <= ST_WAIT_FETCH;
 		stall_one_cycle_d <= 1'b0;
 		ready_i_d <= 1'b0;
 		valid_i_d <= 1'b0;
@@ -346,6 +345,7 @@ assign half_read_after_write =
 		(
 			(rd_o == rs2) && 
 			cs.dec.en.alu_b && 
+			cs_exe_o.en.rf_write && 
 			(cs_exe_o.en.wb_order_flip != (cs.dec.sel.ser_start == SER_START_UH))
 		)
 	);
@@ -454,7 +454,7 @@ always_comb begin
 		end
 		ST_WAIT_FETCH: begin
 			ready_o = 1'b1;
-			valid_o = (state_e_d != ST_WAIT_FETCH) && valid_o_d;
+			valid_o = !ready_i_d && valid_o_d;
 			if (interrupt_i) begin
 				jmp_target_o = interrupt_jmp_target_i;
 			end
