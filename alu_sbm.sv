@@ -82,7 +82,9 @@ always_ff @(posedge clk or negedge rst_n) begin
 		early_cmp_verdict_d <= 1'b0;
 		early_cmp_result_d <= 1'b0;
 	end else if (first_cycle /*//! should gate? */ ) begin
-		shift_in_d <= shift_in;
+		if (shift_used) begin
+			shift_in_d <= shift_in;
+		end
 		early_cmp_verdict_d <= early_cmp_verdict;
 		early_cmp_result_d <= early_cmp_result;
 	end
@@ -132,21 +134,21 @@ always_comb begin
 end
 
 always_comb begin
-	add_a = 16'b0;
-	add_b = 16'b0;
-	xor_a = 16'b0;
-	xor_b = 16'b0;
-	or_a = 16'b0;
-	or_b = 16'b0;
-	and_a = 16'b0;
-	and_b = 16'b0;
-	shift_in = 16'b0;
-	not_in = 16'b0;
-	reduction_or_in = 16'b0;
-	reverse_a_in = 16'b0;
-	reverse_b_in = 16'b0;
-	shift_filler_in = 16'b0;
-	shift_filler_fill = 16'b0;
+	add_a = a_i;
+	add_b = b_i;
+	xor_a = a_i;
+	xor_b = b_i;
+	or_a = a_i;
+	or_b = b_i;
+	and_a = a_i;
+	and_b = b_i;
+	shift_in = a_i;
+	not_in = b_i;
+	reduction_or_in = xor_out;
+	reverse_a_in = a_i;
+	reverse_b_in = shift_out;
+	shift_filler_in = shift_out;
+	shift_filler_fill = shift_in_d;
 	cmp_result_valid = 1'b0;
 	early_cmp_verdict = 1'b0;
 	add_carry_in = 1'b0;

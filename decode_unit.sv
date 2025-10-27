@@ -112,6 +112,7 @@ logic rs16_half_order_flip_d;
 logic signaled_jmp;
 logic signaled_branch;
 logic [31:0] reg32_i_d;
+logic [15:0] alu_a_o_d;
 
 logic valid_o_d;
 
@@ -217,15 +218,17 @@ always_ff @(posedge clk or negedge rst_n) begin
 		valid_o_d <= 1'b0;
 		rs16_half_order_flip_d <= '0;
 		reg32_i_d <= '0;
+		alu_a_o_d <= '0;
 	end else begin
 		state_e_d <= state_e;
 		stall_one_cycle_d <= stall_one_cycle;
 		rs32_d <= rs32_o;
 		valid_o_d <= valid_o;
 		rs16_half_order_flip_d <= cs.dec.en.rs16_half_order_flip;
-		if (first_cycle) begin
+		if (issue && first_cycle) begin
 			reg32_i_d <= reg32_i;
 		end
+		alu_a_o_d <= alu_a_o;
 	end
 end
 
@@ -344,9 +347,13 @@ assign store_load_hazard =
 assign full_read_after_write = 
 	((rd_o != 5'b0) && 
 		(
-			(rd_o == rs1) && 
 			cs_exe_o.en.rf_write && 
-			reg32_used_in_first_cycle
+			(
+				((rd_o == rs1) && 
+				reg32_used_in_first_cycle) ||
+				((rd_o == rs2) && 
+				(cs.dec.sel.alu_wb_sel == ALU_WB_SEL_REG))
+			)
 		)
 	);
 
@@ -354,6 +361,7 @@ assign half_read_after_write =
 	((rd_o != 5'b0) && 
 		(
 			(rd_o == rs2) && 
+			cs_exe_o.en.rf_write && 
 			cs.dec.en.alu_b && 
 			cs_exe_o.en.rf_write && 
 			(cs_exe_o.en.wb_order_flip != (cs.dec.sel.ser_start == SER_START_UH))
