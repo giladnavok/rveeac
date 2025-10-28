@@ -23,6 +23,7 @@ module decode_unit (
 	input logic [31:0] reg32_i, 				///< 32 bit register port data.
 	input logic [31:0] interrupt_jmp_target_i, 	///< Valid when an interrupt is asserted and contains the interrupt 												///  jump target.
 	input logic [31:0] mepc_i, 					///< The value of the MEPC CSR. Used as a jump target in MRET.
+	input logic [15:0] exe_regfile_write_half_i, 					
 
 	// --------- Output Controls --------
 	output cs_exe_s cs_exe_o, 					///< Control signals for EXE stage
@@ -226,7 +227,20 @@ always_ff @(posedge clk or negedge rst_n) begin
 		valid_o_d <= valid_o;
 		rs16_half_order_flip_d <= cs.dec.en.rs16_half_order_flip;
 		if (issue && first_cycle) begin
-			reg32_i_d <= reg32_i;
+			if ((rd_o != 5'b0) && 
+				cs_exe_o.en.rf_write && 
+				((rd_o == rs2) &&
+				(cs.dec.sel.alu_wb_sel == ALU_WB_SEL_REG))) begin
+				if (!cs_exe_o.en.wb_order_flip) begin
+					reg32_i_d[15:0] <= reg32_i[15:0];
+					reg32_i_d[31:16] <= exe_regfile_write_half_i;
+				end else begin
+					reg32_i_d[15:0] <= exe_regfile_write_half_i;
+					reg32_i_d[31:16] <= reg32_i[31:16];
+				end
+			end else begin
+				reg32_i_d <= reg32_i;
+			end
 		end
 		alu_a_o_d <= alu_a_o;
 	end
@@ -350,9 +364,7 @@ assign full_read_after_write =
 			cs_exe_o.en.rf_write && 
 			(
 				((rd_o == rs1) && 
-				reg32_used_in_first_cycle) ||
-				((rd_o == rs2) && 
-				(cs.dec.sel.alu_wb_sel == ALU_WB_SEL_REG))
+				reg32_used_in_first_cycle)
 			)
 		)
 	);

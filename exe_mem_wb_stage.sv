@@ -52,6 +52,7 @@ module exe_mem_wb_stage #(
 	output logic shift_bigger_then_16_o, 		///< Signal ID to not forward lower half.
 	output logic [31:0] interrupt_jmp_target_o, ///< Interrupt jump target
 	output logic [31:0] mepc_o, 					///< CSR MEPC data
+	output logic [15:0] regfile_write_half_o, 					
 	output logic accel_ready_o
 
 );
@@ -368,6 +369,7 @@ assign cmp_result_valid_o = alu_cmp_result_valid && first_two_cycles;
 assign ready_o = alu_cmp_result_valid || (accel_ready && load_store_ready && !first_cycle);
 assign reg32_o = reg32_data;
 assign mepc_o = csr_mepc;
+assign regfile_write_half_o = regfile_write_data;
 assign accel_ready_o = accel_ready;
 
 // TMP:

@@ -54,6 +54,7 @@ logic exe_first_cycle;
 logic exe_shift_bigger_then_16;
 logic exe_dmem_apb_ready_d;
 logic [31:0] exe_mepc;
+logic [15:0] exe_regfile_write_half;
 
 logic exe_interrupt;
 logic exe_accel_ready;
@@ -123,6 +124,7 @@ decode_unit decode (
 	.reg32_i(exe_reg32_out),
 	.interrupt_jmp_target_i(exe_interrupt_jmp_target),
 	.mepc_i(exe_mepc),
+	.exe_regfile_write_half_i(exe_regfile_write_half),
 
 	.cs_exe_o(dec_cs_exe_out),
 	.jmp_o(dec_jmp),
@@ -192,7 +194,8 @@ exe_mem_wb_stage exe_mem_wb (
 	.interrupt_o(exe_interrupt),
 	.accel_ready_o(exe_accel_ready),
 	.interrupt_jmp_target_o(exe_interrupt_jmp_target),
-	.mepc_o(exe_mepc)
+	.mepc_o(exe_mepc),
+	.regfile_write_half_o(exe_regfile_write_half)
 );
 endmodule
 
