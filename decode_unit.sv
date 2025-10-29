@@ -50,7 +50,7 @@ module decode_unit (
 	output logic [4:0] rd_o, 					///< Register file write port index.
 	output logic [4:0] rs32_o, 					///< Register file 32 bit read port index.
 	output logic [4:0] rs16_o, 					///< Register file 16 bit read port index.
-	output logic inst31_o, 					///< Register file 16 bit read port index.
+	output logic inst31_o, 					
 
 	output logic [11:0] csr_addr_o,				///< CSR Address register for EXE stage.
 	output logic [31:0] pc_o					///< Program counter of currently decoded instruction
@@ -60,26 +60,26 @@ module decode_unit (
 //			Internal Wires        
 // ===============================
 	
-logic first_cycle;
 logic reg32_used_in_first_cycle;
 
+logic full_read_after_write_rs1_hazard;
+logic full_read_after_write_rs2_hazard;
+logic half_read_after_write_hazard;
+logic trigger_stall_when_ready;
 logic stall_one_cycle;
 logic store_load_hazard;
-logic full_read_after_write_rs1;
-logic full_read_after_write_rs2;
-logic half_read_after_write;
-logic trigger_stall_when_ready;
-logic issue;
 
 logic signal_jmp_issue_first;
 logic signal_jmp_wait_fetch_or_interrupt;
-
 logic signal_branch_issue_first;
 
 logic inst_jmp_or_branch;
 
 logic [31:0] jmp_target;
 logic [31:0] reg32_i_first_cycle;
+
+logic first_cycle;
+logic issue;
 
 // Decode 
 opcode_e opcode;
@@ -95,20 +95,15 @@ cs_s cs;
 logic [31:0] add_a, add_b, add_out;
 
 // Serializers
-logic [31:0] ser_alu_b_wb_data_in;
-logic [15:0] ser_alu_b_wb_data_out;
-logic ser_alu_b_wb_start;
-cs_ser_start ser_alu_b_wb_start_half;
-
 logic [31:0] ser_alu_a_data_in;
 logic [15:0] ser_alu_a_data_out;
 logic ser_alu_a_start;
 cs_ser_start ser_alu_a_start_half;
 
-//logic [31:0] ser_alu_b_data_in;
-//logic [15:0] ser_alu_b_data_out;
-//logic ser_alu_b_sample;
-//cs_ser_start ser_alu_b_start_half;
+logic [31:0] ser_alu_b_wb_data_in;
+logic [15:0] ser_alu_b_wb_data_out;
+logic ser_alu_b_wb_start;
+cs_ser_start ser_alu_b_wb_start_half;
 
 
 // ===============================
@@ -117,16 +112,18 @@ cs_ser_start ser_alu_a_start_half;
 
 logic [31:0] inst;
 logic [31:0] pc;
-logic [4:0] rs32_d;
-logic ready_i_d;
-logic valid_i_d;
-logic stall_one_cycle_d;
-logic rs16_half_order_flip_d;
+
 logic signaled_jmp;
 logic signaled_branch;
-logic [31:0] reg32_i_d;
-logic [15:0] alu_a_o_d;
 
+logic ready_i_d;
+logic valid_i_d;
+
+logic stall_one_cycle_d;
+logic rs16_half_order_flip_d;
+
+logic [4:0] rs32_o_d;
+logic [31:0] reg32_i_d;
 logic valid_o_d;
 
 
@@ -195,7 +192,8 @@ serializer_32_to_16 #(
 // * ST_ISSUE_FIRST:  Issue first batch of controls and data to exe if it is ready, otherwise stall.
 // * ST_ISSUE_SECOND: Issue the second batch, and sample next instruction if ready, 
 // 	 				  otherwise switch to ST_WAIT_FETCH to wait for IF.
-// * ST_WAIT_FETCH: Wait for IF stage to finish fetching.
+// * ST_WAIT_FETCH:   Wait for the IF stage to finish fetching.
+// * ST_WAIT_FOR:     Wait for certain signals before resuming execution.
 
 enum logic [1:0] {ST_ISSUE_FIRST, ST_ISSUE_SECOND, ST_WAIT_FETCH, ST_WAIT_FOR} state_e, state_e_d;
 
@@ -231,6 +229,7 @@ always_ff @(posedge clk or negedge rst_n) begin
 				if (interrupt_i) begin
 					state_e <= ST_WAIT_FETCH;
 				end
+
 				if (cs.dec.en.wait_for_accel && accel_ready_i) begin
 					if (valid_i) begin
 						inst <= inst_i;
@@ -246,11 +245,6 @@ always_ff @(posedge clk or negedge rst_n) begin
 end
 
 
-assign full_read_after_write_rs2 = 
-		((rd_o != 5'b0) && 
-		cs_exe_o.en.rf_write && 
-		((rd_o == rs2) &&
-		(cs.dec.sel.alu_wb_sel == ALU_WB_SEL_REG)));
 
 // Sample delayed signals
 always_ff @(posedge clk or negedge rst_n) begin
@@ -259,20 +253,19 @@ always_ff @(posedge clk or negedge rst_n) begin
 		stall_one_cycle_d <= 1'b0;
 		ready_i_d <= 1'b0;
 		valid_i_d <= 1'b0;
-		rs32_d <= 5'b0;
+		rs32_o_d <= 5'b0;
 		valid_o_d <= 1'b0;
 		rs16_half_order_flip_d <= '0;
 		reg32_i_d <= '0;
-		alu_a_o_d <= '0;
 	end else begin
 		state_e_d <= state_e;
 		stall_one_cycle_d <= stall_one_cycle;
-		rs32_d <= rs32_o;
+		rs32_o_d <= rs32_o;
 		valid_o_d <= valid_o;
 		rs16_half_order_flip_d <= cs.dec.en.rs16_half_order_flip;
 		if (cs.dec.en.rs1_in_second_cycle) begin
 			if (issue && first_cycle) begin
-				if (full_read_after_write_rs2) begin
+				if (full_read_after_write_rs2_hazard) begin
 					if (!cs_exe_o.en.wb_order_flip) begin
 						reg32_i_d[15:0] <= reg32_i[15:0];
 						reg32_i_d[31:16] <= exe_regfile_write_half_i;
@@ -285,7 +278,6 @@ always_ff @(posedge clk or negedge rst_n) begin
 				end
 			end
 		end
-		alu_a_o_d <= alu_a_o;
 	end
 end
 
@@ -387,8 +379,10 @@ end
 assign ser_alu_b_wb_start = (cs.dec.en.alu_b || cs.dec.en.wb) && first_cycle;
 assign ser_alu_b_wb_start_half = cs.dec.sel.ser_start;
 
-// Stall logic //
-// ----------- //
+// Hazard Detection and Stall Logic //
+// -------------------------------- //
+	
+// Hazards 
 assign reg32_used_in_first_cycle = 
 	cs.dec.en.dmem_load_bypass ||
 	cs.dec.en.lsu_addr ||
@@ -402,7 +396,7 @@ assign store_load_hazard =
 		!exe_dmem_apb_ready_d_i
 	);
 
-assign full_read_after_write_rs1 = 
+assign full_read_after_write_rs1_hazard = 
 	((rd_o != 5'b0) && 
 		(
 			cs_exe_o.en.rf_write && 
@@ -413,7 +407,7 @@ assign full_read_after_write_rs1 =
 		)
 	);
 
-assign half_read_after_write = 
+assign half_read_after_write_hazard = 
 	((rd_o != 5'b0) && 
 		(
 			(rd_o == rs2) && 
@@ -424,11 +418,19 @@ assign half_read_after_write =
 		)
 	);
 
+assign full_read_after_write_rs2_hazard = 
+		((rd_o != 5'b0) && 
+		cs_exe_o.en.rf_write && 
+		((rd_o == rs2) &&
+		(cs.dec.sel.alu_wb_sel == ALU_WB_SEL_REG)));
+
+
+// Stall
 
 assign trigger_stall_when_ready =
 	(store_load_hazard ||
-	full_read_after_write_rs1||
-	half_read_after_write);
+	full_read_after_write_rs1_hazard ||
+	half_read_after_write_hazard);
 		
 assign stall_one_cycle = 
 	trigger_stall_when_ready
@@ -469,9 +471,18 @@ assign rs2 = inst[24:20];
 // ---- //
 	
 assign first_cycle = (state_e == ST_ISSUE_FIRST);
-assign issue = (((state_e == ST_ISSUE_FIRST) && ready_i && !cs.dec.en.wait_for_interrupt && !stall_one_cycle) || (state_e ==  ST_ISSUE_SECOND)) && !misspredict_i;
 assign inst_jmp_or_branch = (opcode inside {OPC_BRANCH, OPC_JAL, OPC_JALR});
 assign reg32_i_first_cycle = first_cycle ? reg32_i : reg32_i_d;
+always_comb begin
+	case (state_e)
+		ST_ISSUE_FIRST: issue = !misspredict_i &&
+								ready_i && 
+								!stall_one_cycle && 
+								!cs.dec.en.wait_for_interrupt;
+		ST_ISSUE_SECOND: issue = !misspredict_i;
+		default: issue = 1'b0;
+	endcase
+end
 
 // Output Combinatorical //
 // --------------------- //
@@ -492,8 +503,8 @@ always_comb begin
 	dmem_load_bypass_o = 1'b0;
 	rs32_o = cs.dec.en.reg32_use ? 
 		((cs.dec.en.lsu_addr || cs.dec.en.dmem_load_bypass || cs.dec.en.jmp) ? rs1 : rs2) 
-		: rs32_d;
-	fetch_stall_for_jmp_target_o = cs.dec.en.jmp && full_read_after_write_rs1 && !issue;
+		: rs32_o_d;
+	fetch_stall_for_jmp_target_o = cs.dec.en.jmp && full_read_after_write_rs1_hazard && !issue;
 	accel_rf_write_o = 1'b0;
 	jmp_target_o = '0;
 
@@ -505,31 +516,18 @@ always_comb begin
 
 	case (state_e)
 		ST_ISSUE_FIRST: begin
-			if (!(interrupt_i && inst_jmp_or_branch)) begin
-				if (ready_i) begin
-					if (!stall_one_cycle) begin
-						if (misspredict_i) begin
-							valid_o = 1'b0;
-						end else begin
-							valid_o = 1'b1;
-							dmem_load_bypass_o = cs.dec.en.dmem_load_bypass;
-							lsu_load_addr_bypass_o = cs.dec.en.dmem_load_bypass ? add_out : '0;
-						end
-					end else begin
-						valid_o = 1'b1;
-					end
-				end else begin
-					valid_o = 1'b1;
-				end
-			end else begin 
-				valid_o = 1'b0;
+			valid_o = !misspredict_i;
+			if (issue) begin
+				dmem_load_bypass_o = cs.dec.en.dmem_load_bypass;
+				lsu_load_addr_bypass_o = cs.dec.en.dmem_load_bypass ? add_out : '0;
 			end
+
 			if (interrupt_i) begin
 				jmp_target_o = interrupt_jmp_target_i;
 			end
 		end
 		ST_ISSUE_SECOND: begin
-			valid_o = valid_o_d;
+			valid_o = 1'b1;
 			ready_o = 1'b1;
 			if (valid_o_d) begin
 				if (cs.exe.en.dmem_store) begin
@@ -542,17 +540,19 @@ always_comb begin
 		ST_WAIT_FETCH: begin
 			ready_o = 1'b1;
 			valid_o = !ready_i_d && valid_o_d;
+
 			if (interrupt_i) begin
 				jmp_target_o = interrupt_jmp_target_i;
 			end
 		end
 		ST_WAIT_FOR: begin
-			if (interrupt_i) begin
-				jmp_target_o = interrupt_jmp_target_i;
-			end
 			if (cs.dec.en.wait_for_accel && accel_ready_i) begin
 				ready_o = valid_i;
 				accel_rf_write_o = 1'b1;
+			end
+
+			if (interrupt_i) begin
+				jmp_target_o = interrupt_jmp_target_i;
 			end
 		end
 	endcase
