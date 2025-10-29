@@ -65,10 +65,10 @@ logic reg32_used_in_first_cycle;
 
 logic stall_one_cycle;
 logic store_load_hazard;
-logic full_read_after_write;
+logic full_read_after_write_rs1;
+logic full_read_after_write_rs2;
 logic half_read_after_write;
 logic trigger_stall_when_ready;
-logic fetch_stall_for_jmp_target_cond;
 logic issue;
 
 logic signal_jmp_issue_first;
@@ -79,6 +79,7 @@ logic signal_branch_issue_first;
 logic inst_jmp_or_branch;
 
 logic [31:0] jmp_target;
+logic [31:0] reg32_i_first_cycle;
 
 // Decode 
 opcode_e opcode;
@@ -93,10 +94,21 @@ cs_s cs;
 // Adder
 logic [31:0] add_a, add_b, add_out;
 
-// Serializer
-logic [31:0] serializer_in;
-logic [15:0] serializer_out;
-logic serializer_en, forward_lower_half;
+// Serializers
+logic [31:0] ser_alu_b_wb_data_in;
+logic [15:0] ser_alu_b_wb_data_out;
+logic ser_alu_b_wb_start;
+cs_ser_start ser_alu_b_wb_start_half;
+
+logic [31:0] ser_alu_a_data_in;
+logic [15:0] ser_alu_a_data_out;
+logic ser_alu_a_start;
+cs_ser_start ser_alu_a_start_half;
+
+//logic [31:0] ser_alu_b_data_in;
+//logic [15:0] ser_alu_b_data_out;
+//logic ser_alu_b_sample;
+//cs_ser_start ser_alu_b_start_half;
 
 
 // ===============================
@@ -144,6 +156,33 @@ imm_gen_sbm imm_gen (
 	.inst_i(inst),
 	.imm_o(imm)
 );
+
+serializer_32_to_16 #(
+	.SAMPLE_ON_START(1)
+) sample_ser_alu_a (
+	.clk(clk),
+	.rst_n(rst_n),
+	
+	.data_i(ser_alu_a_data_in),
+	.start_i(ser_alu_a_start),
+	.start_half_i(ser_alu_a_start_half),
+	
+	.data_o(ser_alu_a_data_out)
+);
+
+serializer_32_to_16 #(
+	.SAMPLE_ON_START(0)
+) sample_ser_alu_b_wb (
+	.clk(clk),
+	.rst_n(rst_n),
+	
+	.data_i(ser_alu_b_wb_data_in),
+	.start_i(ser_alu_b_wb_start),
+	.start_half_i(ser_alu_b_wb_start_half),
+	
+	.data_o(ser_alu_b_wb_data_out)
+);
+
 
 // ===============================
 //			Seqential Logic
@@ -207,6 +246,11 @@ always_ff @(posedge clk or negedge rst_n) begin
 end
 
 
+assign full_read_after_write_rs2 = 
+		((rd_o != 5'b0) && 
+		cs_exe_o.en.rf_write && 
+		((rd_o == rs2) &&
+		(cs.dec.sel.alu_wb_sel == ALU_WB_SEL_REG)));
 
 // Sample delayed signals
 always_ff @(posedge clk or negedge rst_n) begin
@@ -226,20 +270,19 @@ always_ff @(posedge clk or negedge rst_n) begin
 		rs32_d <= rs32_o;
 		valid_o_d <= valid_o;
 		rs16_half_order_flip_d <= cs.dec.en.rs16_half_order_flip;
-		if (issue && first_cycle) begin
-			if ((rd_o != 5'b0) && 
-				cs_exe_o.en.rf_write && 
-				((rd_o == rs2) &&
-				(cs.dec.sel.alu_wb_sel == ALU_WB_SEL_REG))) begin
-				if (!cs_exe_o.en.wb_order_flip) begin
-					reg32_i_d[15:0] <= reg32_i[15:0];
-					reg32_i_d[31:16] <= exe_regfile_write_half_i;
+		if (cs.dec.en.rs1_in_second_cycle) begin
+			if (issue && first_cycle) begin
+				if (full_read_after_write_rs2) begin
+					if (!cs_exe_o.en.wb_order_flip) begin
+						reg32_i_d[15:0] <= reg32_i[15:0];
+						reg32_i_d[31:16] <= exe_regfile_write_half_i;
+					end else begin
+						reg32_i_d[15:0] <= exe_regfile_write_half_i;
+						reg32_i_d[31:16] <= reg32_i[31:16];
+					end
 				end else begin
-					reg32_i_d[15:0] <= exe_regfile_write_half_i;
-					reg32_i_d[31:16] <= reg32_i[31:16];
+					reg32_i_d <= reg32_i;
 				end
-			end else begin
-				reg32_i_d <= reg32_i;
 			end
 		end
 		alu_a_o_d <= alu_a_o;
@@ -288,10 +331,10 @@ always_ff @(posedge clk or negedge rst_n) begin
 				lsu_store_addr_o <= add_out;
 			end
 			if (cs.dec.en.alu_b && !(cs.dec.en.forward_just_one_half && !first_cycle)) begin 
-				alu_b_o <= serializer_out;
+				alu_b_o <= ser_alu_b_wb_data_out;
 			end
 			if (cs.dec.en.wb) begin
-				wb_o <= serializer_out;
+				wb_o <= ser_alu_b_wb_data_out;
 			end
 			if (cs.dec.en.cs_exe) begin
 				cs_exe_o <= cs.exe;
@@ -321,27 +364,28 @@ end
 
 // Adder Logic  //
 // ------------ //
+assign add_a = (cs.dec.sel.add_sel == DEC_ADD_SEL_PC) ? pc : reg32_i;
 assign add_b = imm;
-assign add_a = (cs.dec.sel.add_sel == DEC_ADD_SEL_PC) ? pc : (first_cycle? reg32_i : reg32_i_d);
 assign add_out = add_a + add_b;
 
 
 // Serializer Logic //
 // ---------------- //
-assign serializer_en = (cs.dec.en.alu_b || cs.dec.en.wb);
-assign forward_lower_half = (cs.dec.sel.ser_start == SER_START_LH) ? 
-	first_cycle : ~first_cycle;
-assign serializer_out = (serializer_en && forward_lower_half) ? 
-	serializer_in[15:0] : serializer_in[31:16];
+
+assign ser_alu_a_data_in = reg32_i;
+assign ser_alu_a_start = issue && !first_cycle;
+assign ser_alu_a_start_half = cs.dec.en.rs16_half_order_flip ? SER_START_UH : SER_START_LH;
 
 always_comb begin
 	case (cs.dec.sel.alu_wb_sel)
-		ALU_WB_SEL_IMM: serializer_in = imm;
-		ALU_WB_SEL_REG: serializer_in = first_cycle ? reg32_i : reg32_i_d;
-		ALU_WB_SEL_PC: serializer_in = pc;
-		ALU_WB_SEL_ADDER: serializer_in = add_out;
+		ALU_WB_SEL_IMM: ser_alu_b_wb_data_in = imm;
+		ALU_WB_SEL_REG: ser_alu_b_wb_data_in = reg32_i_first_cycle;
+		ALU_WB_SEL_PC: ser_alu_b_wb_data_in = pc;
+		ALU_WB_SEL_ADDER: ser_alu_b_wb_data_in = add_out;
 	endcase
 end
+assign ser_alu_b_wb_start = (cs.dec.en.alu_b || cs.dec.en.wb) && first_cycle;
+assign ser_alu_b_wb_start_half = cs.dec.sel.ser_start;
 
 // Stall logic //
 // ----------- //
@@ -358,7 +402,7 @@ assign store_load_hazard =
 		!exe_dmem_apb_ready_d_i
 	);
 
-assign full_read_after_write = 
+assign full_read_after_write_rs1 = 
 	((rd_o != 5'b0) && 
 		(
 			cs_exe_o.en.rf_write && 
@@ -383,7 +427,7 @@ assign half_read_after_write =
 
 assign trigger_stall_when_ready =
 	(store_load_hazard ||
-	full_read_after_write ||
+	full_read_after_write_rs1||
 	half_read_after_write);
 		
 assign stall_one_cycle = 
@@ -421,45 +465,23 @@ assign rd = inst[11:7];
 assign rs1 = inst[19:15];
 assign rs2 = inst[24:20];
 
-// Output Combinatorical //
-// --------------------- //
+// Misc //
+// ---- //
+	
 assign first_cycle = (state_e == ST_ISSUE_FIRST);
 assign issue = (((state_e == ST_ISSUE_FIRST) && ready_i && !cs.dec.en.wait_for_interrupt && !stall_one_cycle) || (state_e ==  ST_ISSUE_SECOND)) && !misspredict_i;
-assign jmp_o = !signaled_jmp && (signal_jmp_issue_first || signal_jmp_wait_fetch_or_interrupt);
-assign branch_o = !signaled_branch && signal_branch_issue_first;
-
 assign inst_jmp_or_branch = (opcode inside {OPC_BRANCH, OPC_JAL, OPC_JALR});
+assign reg32_i_first_cycle = first_cycle ? reg32_i : reg32_i_d;
+
+// Output Combinatorical //
+// --------------------- //
+
 assign resume_execution_from_dec_inst_o = inst_jmp_or_branch || cs.dec.en.wait_for_accel;
 assign ready_for_interrupt_o = (state_e != ST_ISSUE_SECOND);
 assign pc_o = pc;
-
-logic [15:0] second_half_alu_a;
-always_ff @(posedge clk or negedge rst_n) begin
-	if (!rst_n) begin
-		second_half_alu_a <= '0;
-	end else begin
-		if (issue && !first_cycle) begin
-			if (!cs.dec.en.rs16_half_order_flip) begin
-				second_half_alu_a <= reg32_i[31:16];
-			end else begin
-				second_half_alu_a <= reg32_i[15:0];
-			end
-		end
-	end
-
-end
-always_comb begin
-	alu_a_o = '0;
-	if (state_e_d == ST_ISSUE_SECOND) begin
-		alu_a_o = second_half_alu_a;
-	end else begin
-		if (!rs16_half_order_flip_d) begin
-			alu_a_o = reg32_i[15:0];
-		end else begin
-			alu_a_o = reg32_i[31:16];
-		end
-	end
-end
+assign alu_a_o = ser_alu_a_data_out;
+assign jmp_o = !signaled_jmp && (signal_jmp_issue_first || signal_jmp_wait_fetch_or_interrupt);
+assign branch_o = !signaled_branch && signal_branch_issue_first;
 
 always_comb begin
 	inst31_o = inst[31];
@@ -468,8 +490,10 @@ always_comb begin
 	jmp_target_o = '0;
 	lsu_load_addr_bypass_o = '0;
 	dmem_load_bypass_o = 1'b0;
-	rs32_o = cs.dec.en.reg32_use ? ((cs.dec.en.lsu_addr || cs.dec.en.dmem_load_bypass || cs.dec.en.jmp) ? rs1 : rs2) : rs32_d;
-	fetch_stall_for_jmp_target_o = cs.dec.en.jmp && full_read_after_write && !issue;
+	rs32_o = cs.dec.en.reg32_use ? 
+		((cs.dec.en.lsu_addr || cs.dec.en.dmem_load_bypass || cs.dec.en.jmp) ? rs1 : rs2) 
+		: rs32_d;
+	fetch_stall_for_jmp_target_o = cs.dec.en.jmp && full_read_after_write_rs1 && !issue;
 	accel_rf_write_o = 1'b0;
 	jmp_target_o = '0;
 
@@ -508,7 +532,11 @@ always_comb begin
 			valid_o = valid_o_d;
 			ready_o = 1'b1;
 			if (valid_o_d) begin
-				rs32_o = cs.exe.en.dmem_store ? rs2 : rs1;
+				if (cs.exe.en.dmem_store) begin
+					rs32_o = rs2;
+				end else if (cs.dec.en.rs1_in_second_cycle) begin
+					rs32_o = rs1;
+				end 
 			end
 		end
 		ST_WAIT_FETCH: begin

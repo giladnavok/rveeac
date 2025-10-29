@@ -327,7 +327,7 @@ end
 // CSR Write Mux
 always_comb begin
 	case (cs_i.sel.csr_write)
-		CSR_W_SEL_REG: csr_write_data = reg16_data;
+		CSR_W_SEL_REG: csr_write_data = alu_a_i;
 		CSR_W_SEL_ALU: csr_write_data = alu_out;
 		CSR_W_SEL_IMM: csr_write_data = csr_imm_ext;
 	endcase

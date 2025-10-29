@@ -147,6 +147,7 @@ package typedefs;
 		logic wait_for_interrupt;
 		logic wait_for_accel;
 		logic rs16_half_order_flip;
+		logic rs1_in_second_cycle;
 	} cs_dec_en_s;
 
 	typedef struct packed {
@@ -296,7 +297,8 @@ package typedefs;
 			csr_imm_bypass: DISABLE,
 			wait_for_interrupt: DISABLE,
 			wait_for_accel: DISABLE,
-			rs16_half_order_flip: DISABLE
+			rs16_half_order_flip: DISABLE,
+			rs1_in_second_cycle: DISABLE
 		};
 	parameter cs_exe_en_s 
 	CS_EXE_EN_DEFAULT = '{

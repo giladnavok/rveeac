@@ -139,6 +139,7 @@ always_comb begin
 			cs_o.dec.en.alu_b = ENABLE;
 			cs_o.dec.en.reg32_use = ENABLE;
 			cs_o.dec.en.branch = ENABLE;
+			cs_o.dec.en.rs1_in_second_cycle = ENABLE;
 
 			// Execution Stage //
 			// --------------- //
@@ -244,6 +245,7 @@ always_comb begin
 			// Enable //
 			cs_o.dec.en.alu_b = ENABLE;
 			cs_o.dec.en.reg32_use = opcode_i[5];
+			cs_o.dec.en.rs1_in_second_cycle = ENABLE;
 
 			// Execution Stage //
 			// --------------- //
@@ -306,6 +308,7 @@ always_comb begin
 				// Enable //
 				cs_o.dec.en.csr_addr = ENABLE;
 				cs_o.dec.en.csr_imm_bypass = funct3_i[2];
+				cs_o.dec.en.rs1_in_second_cycle = !funct3_i[2];
 
 				// Execution Stage //
 				// --------------- //

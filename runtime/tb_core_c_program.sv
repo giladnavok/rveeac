@@ -98,9 +98,6 @@ always_ff @(posedge clk or negedge rst_n) begin
 	end
 end
 
-
-
-
 always #2 clk = ~clk;
 
 initial begin
