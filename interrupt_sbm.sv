@@ -29,7 +29,7 @@ logic interrupt;
 logic [4:0] cause;
 
 localparam bit [4:0] CAUSE_MEI = 5'd11;
-localparam bit [4:0] CAUSE_AES = 5'd16;
+localparam bit [4:0] CAUSE_ACCEL = 5'd16;
 
 always_comb begin
 	cause = 5'b0;
@@ -39,7 +39,7 @@ always_comb begin
 			cause = CAUSE_MEI;
 			interrupt = 1'b1;
 		end else if ((mip_i[16] && mie_i[16])) begin
-			cause = CAUSE_AES;
+			cause = CAUSE_ACCEL;
 			interrupt = 1'b1;
 		end
 	end

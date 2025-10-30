@@ -16,7 +16,7 @@ module exe_mem_wb_stage #(
 	
 	input logic interrupt_req_ext_i, 			///< Bypass from ID stage - Start early load if possible
 	input logic dec_ready_for_interrupt_i,		///< Indicates whether ID stage can be interrupted
-	input logic accel_rf_write_i,		///< Indicates whether ID stage can be interrupted
+	input logic accel_rf_write_i,				///< Indicates whether ID stage can be interrupted
 
 	//--
 	apb_if.master dmem_apb, 					///< DMEM APB Interface
@@ -34,7 +34,10 @@ module exe_mem_wb_stage #(
 	input logic [11:0] csr_addr_i, 				///< CSR Address
 	input logic [31:0] fetch_pc_next_i, 		///< PC of currently fetched instruction in IF stage
 	input logic [31:0] dec_pc_i,				///< PC of currently decoded instruction in ID stage
-	input logic dec_resume_execution_from_dec_inst_i,	
+	input logic dec_resume_execution_from_dec_inst_i, ///< Determines whether execution after an 
+													  ///  interrupt should be resumed from the
+													  ///  instruction currently fetched or the 
+													  ///  instruction currently in decode.
 
 	// --------- Output Controls --------
 	output logic ready_o, 						///< Execution stage ready for new controls and data
@@ -51,9 +54,10 @@ module exe_mem_wb_stage #(
 	output logic cmp_result_valid_o, 			///< Comperator result is valid for IF stage
 	output logic shift_bigger_then_16_o, 		///< Signal ID to not forward lower half.
 	output logic [31:0] interrupt_jmp_target_o, ///< Interrupt jump target
-	output logic [31:0] mepc_o, 					///< CSR MEPC data
-	output logic [15:0] regfile_write_half_o, 					
-	output logic accel_ready_o
+	output logic [31:0] mepc_o, 				///< CSR MEPC data
+	output logic [15:0] regfile_write_half_o, 	///< Value of the half currently written to the register file.
+												///  Used for forwarding.
+	output logic accel_ready_o					///< Used in ID stage for the implementation of `wait for accel` instruction.
 
 );
 
@@ -104,9 +108,7 @@ logic [11:0] csr_addr;
 logic [15:0] csr_write_data;
 logic csr_valid;
 logic [15:0] csr_read_data_out;
-
 logic [15:0] csr_imm_ext;
-
 logic [31:0] csr_mepc;
 logic [31:0] csr_mip;
 logic [31:0] csr_mie;
@@ -121,12 +123,9 @@ logic interrupt_req_aes;
 
 logic int_mepc_write;
 logic [31:0] int_mepc_write_data;
-
 logic int_mcause_write;
 logic [31:0] int_mcause_write_data;
-
 logic int_store_clear_mstatus_mie;
-
 
 // Misc
 logic first_two_cycles;

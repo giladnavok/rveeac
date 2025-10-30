@@ -38,6 +38,7 @@ if (SAMPLE_ON_START == 1) begin : sample_serializer
 	logic start_i_d;
 
 	always_comb begin
+		first_half = '0;
 		case (start_half_i) 
 			SER_START_LH: first_half = lower_half;
 			SER_START_UH: first_half = upper_half;
@@ -53,6 +54,7 @@ if (SAMPLE_ON_START == 1) begin : sample_serializer
 				case (start_half_i) 
 					SER_START_LH: second_half <= upper_half;
 					SER_START_UH: second_half <= lower_half;
+					default: second_half <= '0;
 				endcase
 			end
 			start_i_d <= start_i;
@@ -63,12 +65,14 @@ if (SAMPLE_ON_START == 1) begin : sample_serializer
 
 end else begin : no_sample_serializer
 	always_comb begin
+		first_half = '0;
 		case (start_half_i) 
 			SER_START_LH: first_half = lower_half;
 			SER_START_UH: first_half = upper_half;
 		endcase
 	end
 	always_comb begin
+		second_half = '0;
 		case (start_half_i) 
 			SER_START_LH: second_half = upper_half;
 			SER_START_UH: second_half = lower_half;

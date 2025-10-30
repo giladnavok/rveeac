@@ -16,9 +16,8 @@ module fetch_unit # (
 	input logic ready_i, 					///< Downstream stage can accept inst
 	input logic branch_cmp_result_valid_i,  ///< Comperator result valid
 	input logic stall_for_jmp_target_i,     ///< Stall fetching when asserted
-	input logic interrupt_i,						
+	input logic interrupt_i,				///< Interrupt triggered. Used to distinguish interrupt jumps.
 
-	//--
 	apb_if.master imem_apb, 				///< IMEM APB Interface
 
 	// --------- Input Data -------
@@ -34,7 +33,7 @@ module fetch_unit # (
 	// --------- Output Data --------
 	output logic [31:0] inst_o, 			///< Output fetched instruction
 	output logic [31:0] pc_o, 				///< Output PC of fetched instruction
-	output logic [31:0] pc_next_o 		///< Output PC of currently fetched instruction
+	output logic [31:0] pc_next_o 			///< Output PC of currently fetched instruction
 );
 
 localparam LOG2_PREFETCH_BUFFER_CAPACITY = $clog2(PREFETCH_BUFFER_CAPACITY);
@@ -158,8 +157,6 @@ prefetch_buffer_sbm # (
 // 					   discarding it.
 //
 
-
-
 always_ff @(posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		state_e <= ST_INIT_FETCH;
@@ -231,7 +228,6 @@ always_ff @(posedge clk or negedge rst_n) begin
 			ST_FETCH: begin
 				assert(!prefetch_full);
 				if (jmp_i) begin
-					//assert(interrupt);
 					jmp_requested <= 1'b1;
 					jmp_target_requested <= jmp_target_i;
 					state_e <= ST_FETCH_DISCARD;
@@ -342,7 +338,9 @@ end
 //		Combinatorical Logic
 // ===============================
 
-assign redirect = misspredict || jmp_i || (branch_i && take_branch && !(state_e inside {ST_FETCH, ST_FETCH_SPEC}));
+assign redirect = misspredict ||
+				  jmp_i || 
+				  (branch_i && take_branch && !(state_e inside {ST_FETCH, ST_FETCH_SPEC}));
 assign interrupt = interrupt_i && jmp_i;
 assign in_speculative_state = state_e inside {ST_INIT_FETCH_SPEC, ST_FETCH_SPEC, ST_FULL_BUFFER_SPEC};
 assign pc_next = pc_current + 4;

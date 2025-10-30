@@ -15,15 +15,18 @@ module decode_unit (
 												///  and should be flushed.
 	input logic interrupt_i, 					///< Triggers an interrupt when asserted.
 	
-	input logic accel_ready_i,			
+	input logic accel_ready_i,					///< Signals if the accelerator in EXE stage is ready.
+												///  Used for a `wait for accelerator` instruction
 
 	// --------- Input Data  ------------
 	input logic [31:0] inst_i, 					///< Instruction from IF stage
 	input logic [31:0] pc_i, 					///< Instruction's PC from IF stage
 	input logic [31:0] reg32_i, 				///< 32 bit register port data.
-	input logic [31:0] interrupt_jmp_target_i, 	///< Valid when an interrupt is asserted and contains the interrupt 												///  jump target.
+	input logic [31:0] interrupt_jmp_target_i, 	///< Valid when an interrupt is asserted and contains the interrupt 		
+												///  jump target.
 	input logic [31:0] mepc_i, 					///< The value of the MEPC CSR. Used as a jump target in MRET.
-	input logic [15:0] exe_regfile_write_half_i, 					
+	input logic [15:0] exe_regfile_write_half_i,///< Forwarded Value of the half currently written to the regfile in EXE stage.
+												///	 Used to deal with a full read after write of rs2 hazard.
 
 	// --------- Output Controls --------
 	output cs_exe_s cs_exe_o, 					///< Control signals for EXE stage
@@ -35,7 +38,8 @@ module decode_unit (
 	output logic exe_first_cycle_o, 			///< First cycle signal for EXE stage
 	output logic fetch_stall_for_jmp_target_o,	///< Asserted when the IF stage should pause fetching, until the 
 												///  correct jump target is outputed.
-	output logic resume_execution_from_dec_inst_o,			
+	output logic resume_execution_from_dec_inst_o, ///< Execution after interrupt handling should resume from the 
+												   ///  instruction currently in ID stage. 
 												
 	output logic ready_for_interrupt_o,			///< Asserted when the ID is ready to recieve an interrupt.
 	output logic accel_rf_write_o,			
@@ -169,7 +173,7 @@ serializer_32_to_16 #(
 
 serializer_32_to_16 #(
 	.SAMPLE_ON_START(0)
-) sample_ser_alu_b_wb (
+) no_sample_ser_alu_b_wb (
 	.clk(clk),
 	.rst_n(rst_n),
 	
@@ -244,8 +248,6 @@ always_ff @(posedge clk or negedge rst_n) begin
 	end
 end
 
-
-
 // Sample delayed signals
 always_ff @(posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
@@ -263,6 +265,7 @@ always_ff @(posedge clk or negedge rst_n) begin
 		rs32_o_d <= rs32_o;
 		valid_o_d <= valid_o;
 		rs16_half_order_flip_d <= cs.dec.en.rs16_half_order_flip;
+
 		if (cs.dec.en.rs1_in_second_cycle) begin
 			if (issue && first_cycle) begin
 				if (full_read_after_write_rs2_hazard) begin
@@ -278,6 +281,7 @@ always_ff @(posedge clk or negedge rst_n) begin
 				end
 			end
 		end
+
 	end
 end
 
@@ -361,7 +365,7 @@ assign add_b = imm;
 assign add_out = add_a + add_b;
 
 
-// Serializer Logic //
+// Serializers Logic //
 // ---------------- //
 
 assign ser_alu_a_data_in = reg32_i;
