@@ -19,7 +19,7 @@ module load_store_unit (
 
 	// Input Data //
 	// -------------- //
-	input logic [31:0] reg1_i,
+	input logic [31:0] reg1_i, //! Maybe change to write_data
 	input logic [31:0] addr_i,
 
 	// Output Controls //

@@ -17,6 +17,7 @@ module sub_bytes #(
 
 );
 
+    localparam num_of_bytes = WIDTH / 8;
 
     // Parameter sanity checks
     initial begin
@@ -49,7 +50,6 @@ module sub_bytes #(
     s_box_t s_box_s;
 
     logic [3:0] byte_idx;
-    localparam num_of_bytes = WIDTH / 8;
     logic [WIDTH-1:0] temp_res;
     
     always_ff @( posedge clk or negedge rst_n ) begin : s_box

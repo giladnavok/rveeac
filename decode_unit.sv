@@ -42,7 +42,9 @@ module decode_unit (
 												   ///  instruction currently in ID stage. 
 												
 	output logic ready_for_interrupt_o,			///< Asserted when the ID is ready to recieve an interrupt.
-	output logic accel_rf_write_o,			
+	output logic accel_rf_write_o,				///< Writes the Accelerator output to the Register File.
+	output logic accel_start_enc_bypass_o,		///< Initiates an Accelerator encryption.	
+	output logic accel_start_dec_bypass_o,		///< Initiates an Accelerator decryption.
 
 	// --------- Output Data  -----------
 	output logic [31:0] lsu_store_addr_o, 		///< Store address for LSU - FF
@@ -50,11 +52,11 @@ module decode_unit (
 	output logic [31:0] jmp_target_o, 			///< Jump target for IF stage.
 	output logic [15:0] alu_a_o, 				///< ALU input a data register for EXE stage.
 	output logic [15:0] alu_b_o, 				///< ALU input b data register for EXE stage.
-	output logic [15:0] wb_o, 					///< WB data from EXE stage.
+	output logic [15:0] wb_o, 					///< WB data for EXE stage.
 	output logic [4:0] rd_o, 					///< Register file write port index.
 	output logic [4:0] rs32_o, 					///< Register file 32 bit read port index.
 	output logic [4:0] rs16_o, 					///< Register file 16 bit read port index.
-	output logic inst31_o, 					
+	output logic inst31_o, 						///< The current instruction MSB.
 
 	output logic [11:0] csr_addr_o,				///< CSR Address register for EXE stage.
 	output logic [31:0] pc_o					///< Program counter of currently decoded instruction
@@ -210,7 +212,7 @@ always_ff @(posedge clk or negedge rst_n) begin
 	end else begin
 		case (state_e)
 			ST_ISSUE_FIRST: begin
-				if (cs.dec.en.wait_for_interrupt || cs.dec.en.wait_for_accel) begin
+				if (ready_i && !misspredict_i && (cs.dec.en.wait_for_interrupt || cs.dec.en.wait_for_accel)) begin
 					state_e <= ST_WAIT_FOR;
 				end else if (ready_i) begin
 					state_e <= misspredict_i ? ST_WAIT_FETCH :
@@ -230,7 +232,7 @@ always_ff @(posedge clk or negedge rst_n) begin
 					
 			end
 			ST_WAIT_FOR: begin
-				if (interrupt_i) begin
+				if (interrupt_i || misspredict_i) begin
 					state_e <= ST_WAIT_FETCH;
 				end
 
@@ -482,7 +484,8 @@ always_comb begin
 		ST_ISSUE_FIRST: issue = !misspredict_i &&
 								ready_i && 
 								!stall_one_cycle && 
-								!cs.dec.en.wait_for_interrupt;
+								!cs.dec.en.wait_for_interrupt &&
+							 	!cs.dec.en.wait_for_accel;
 		ST_ISSUE_SECOND: issue = !misspredict_i;
 		default: issue = 1'b0;
 	endcase
@@ -511,6 +514,8 @@ always_comb begin
 	fetch_stall_for_jmp_target_o = cs.dec.en.jmp && full_read_after_write_rs1_hazard && !issue;
 	accel_rf_write_o = 1'b0;
 	jmp_target_o = '0;
+	accel_start_enc_bypass_o = 1'b0;
+	accel_start_dec_bypass_o = 1'b0;
 
 	if (cs.dec.en.branch) begin
 		jmp_target_o = jmp_target;
@@ -531,8 +536,8 @@ always_comb begin
 			end
 		end
 		ST_ISSUE_SECOND: begin
-			valid_o = 1'b1;
-			ready_o = 1'b1;
+			valid_o = 1'b1; //! Maybe !misspredict_i ?
+			ready_o = 1'b1; 
 			if (valid_o_d) begin
 				if (cs.exe.en.dmem_store) begin
 					rs32_o = rs2;
@@ -550,9 +555,11 @@ always_comb begin
 			end
 		end
 		ST_WAIT_FOR: begin
-			if (cs.dec.en.wait_for_accel && accel_ready_i) begin
+			if (!misspredict_i && cs.dec.en.wait_for_accel && accel_ready_i) begin
 				ready_o = valid_i;
 				accel_rf_write_o = 1'b1;
+				accel_start_enc_bypass_o = cs.exe.en.accel_start_enc;
+				accel_start_dec_bypass_o = cs.exe.en.accel_start_dec;
 			end
 
 			if (interrupt_i) begin

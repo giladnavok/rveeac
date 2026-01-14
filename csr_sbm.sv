@@ -38,7 +38,7 @@ localparam bit [31:0] WMASK_DEFAULT = '1;
 // ------------------------- //
 
 localparam bit [11:0] ADDR_MSTATUS = 12'h300;
-localparam bit [31:0] WMASK_MSTATUS = 32'h888, 
+localparam bit [31:0] WMASK_MSTATUS = 32'h888, //! Maybe 32'h88 as those bits should not be writeable?
 					  RESET_MSTATUS = (32'b11 << 11) | (32'b1 << 3);
 
 localparam bit [11:0] ADDR_MIE = 12'h304;

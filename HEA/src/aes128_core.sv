@@ -36,6 +36,10 @@ module aes128_core #(
     logic         dec_ready, dec_done;
     
     logic done_pulse;
+
+	logic data_o_source;
+	localparam logic DATA_SRC_ENC = 1'b0;
+	localparam logic DATA_SRC_DEC = 1'b1;
     
     // Encryption unit
     aes128_encrypt #(.SBOX_PAR_KEY(SBOX_PAR_KEY),.SBOX_PAR_ROUND(SBOX_PAR_ROUND))
@@ -67,6 +71,7 @@ module aes128_core #(
         if (!rst_n) begin
             key       <= 128'b0;
             aes_s     <= IDLE;
+			data_o_source <= DATA_SRC_ENC;
         end else begin
 
             case (aes_s)
@@ -80,13 +85,15 @@ module aes128_core #(
 
                 ENCRYPT: begin
                     if (enc_done) begin
-                        aes_s     <= IDLE;
+						aes_s     <= IDLE;
+						data_o_source <= DATA_SRC_ENC;
                     end
                 end
 
                 DECRYPT: begin
                     if (dec_done) begin
-                        aes_s     <= IDLE;
+						aes_s     <= IDLE;
+						data_o_source <= DATA_SRC_DEC;
                     end
                 end
 
@@ -96,12 +103,10 @@ module aes128_core #(
     end
     
     always_comb begin
-        data_o = 128'b0;
+        data_o = (data_o_source == DATA_SRC_ENC) ? enc_text_o : dec_text_o;
 		// drive ready/done
-		ready_o = enc_ready && dec_ready;  // only valid when neither unit is running
+		ready_o = (aes_s == IDLE) && enc_ready && dec_ready;  // only valid when neither unit is running
         done_o = enc_done || dec_done;
-        if (enc_done) data_o = enc_text_o;
-        else if (dec_done) data_o = dec_text_o;
     end
 
 

@@ -1,10 +1,10 @@
 #include <stdint.h>
 
-#define _ACCEL_LOAD_KEY() __asm__(".word 0x0000003b")
-#define _ACCEL_ST_ENC()   __asm__(".word 0x0000103b")
-#define _ACCEL_ST_DEC()   __asm__(".word 0x0000203b")
+#define AES_LOAD_KEY() __asm__(".word 0x0000003b")
+#define AES_ENC()   __asm__(".word 0x0000103b")
+#define AES_DEC()   __asm__(".word 0x0000203b")
 
-#define _ACCEL_SYNC() { \
+#define AES_SYNC() { \
 	__asm__( \
 		".word 0x0000403b" \
 		: \
@@ -12,7 +12,23 @@
 		: "t3", "t4", "t5", "t6"); \
 }\
 
-#define _LOAD_BLOCK_TO_REGS(ptr){ \
+#define AES_ENC_S() { \
+	__asm__( \
+		".word 0x0000503b" \
+		: \
+		: \
+		: "t3", "t4", "t5", "t6"); \
+}\
+
+#define AES_DEC_S() { \
+	__asm__( \
+		".word 0x0000603b" \
+		: \
+		: \
+		: "t3", "t4", "t5", "t6"); \
+}\
+
+#define LOAD_BLOCK_TO_REGS(ptr){ \
 	__asm__ volatile ( \
 		"lw t3, 0(%0)\n" \
 		"lw t4, 4(%0)\n" \
@@ -23,7 +39,7 @@
 		: "t3", "t4", "t5", "t6", "memory"); \
 }\
 
-#define _STORE_BLOCK_FROM_REGS(ptr){ \
+#define STORE_BLOCK_FROM_REGS(ptr){ \
 	__asm__ volatile ( \
 		"sw t3, 0(%0)\n" \
 		"sw t4, 4(%0)\n" \

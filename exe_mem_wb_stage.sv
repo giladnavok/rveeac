@@ -14,9 +14,12 @@ module exe_mem_wb_stage #(
 	input logic dmem_load_bypass_i, 			///< Bypass from ID stage - Start early load if possible
 	input cs_exe_s cs_i, 						///< Control signals
 	
-	input logic interrupt_req_ext_i, 			///< Bypass from ID stage - Start early load if possible
+	input logic interrupt_req_ext_i, 			///< External interrupt request.
 	input logic dec_ready_for_interrupt_i,		///< Indicates whether ID stage can be interrupted
-	input logic accel_rf_write_i,				///< Indicates whether ID stage can be interrupted
+	input logic accel_rf_write_i,				///< Writes the Accelerator output to the Register File.
+	input logic accel_start_enc_bypass_i,		///< Initiates an Accelerator encryption
+	input logic accel_start_dec_bypass_i,		///< Initiates an Accelerator decryption
+
 
 	//--
 	apb_if.master dmem_apb, 					///< DMEM APB Interface
@@ -52,12 +55,12 @@ module exe_mem_wb_stage #(
 		output logic [15:0] registers_od [1:0][31:0],
 	`endif
 	output logic cmp_result_valid_o, 			///< Comperator result is valid for IF stage
-	output logic shift_bigger_then_16_o, 		///< Signal ID to not forward lower half.
+	output logic shift_bigger_then_16_o, 		///< Signal ID to not forward lower half. //! shift_bigger_than
 	output logic [31:0] interrupt_jmp_target_o, ///< Interrupt jump target
 	output logic [31:0] mepc_o, 				///< CSR MEPC data
 	output logic [15:0] regfile_write_half_o, 	///< Value of the half currently written to the register file.
 												///  Used for forwarding.
-	output logic accel_ready_o					///< Used in ID stage for the implementation of `wait for accel` instruction.
+	output logic accel_ready_o					///< Accelerator is ready; Used in ID stage for the implementation of `wait for accel` instruction.
 
 );
 
@@ -99,7 +102,7 @@ logic accel_start_dec;
 logic [127:0] accel_data_in;
 logic [127:0] accel_data_out;
 logic accel_ready;
-logic accel_done;
+logic accel_done; //! Maybe remove
 
 // CSR
 logic csr_write;
@@ -216,7 +219,7 @@ aes128_core accel (
 
 	.data_o(accel_data_out),
 	.ready_o(accel_ready),
-	.done_o(accel_done)
+	.done_o(accel_done) //! Maybe remove
 );
 
 csr_sbm csr (
@@ -338,8 +341,8 @@ assign lsu_addr = (cs_i.en.dmem_store && !dmem_load_bypass_i) ? lsu_store_addr_i
 assign load_store_write = cs_i.en.dmem_store && !dmem_load_bypass_i;
 
 assign accel_load_key = cs_i.en.accel_load_key && valid_i && first_cycle;
-assign accel_start_enc = cs_i.en.accel_start_enc && valid_i && first_cycle;
-assign accel_start_dec = cs_i.en.accel_start_dec && valid_i && first_cycle;
+assign accel_start_enc = accel_start_enc_bypass_i || (cs_i.en.accel_start_enc && valid_i && first_cycle);
+assign accel_start_dec = accel_start_dec_bypass_i || (cs_i.en.accel_start_dec && valid_i && first_cycle);
 
 assign csr_write = valid_i && cs_i.en.csr_write;
 assign csr_h_sel = cs_i.en.csr_req && !first_cycle;
@@ -365,7 +368,7 @@ always_comb begin
 end
 
 assign cmp_result_valid_o = alu_cmp_result_valid && first_two_cycles;
-assign ready_o = alu_cmp_result_valid || (accel_ready && load_store_ready && !first_cycle);
+assign ready_o = alu_cmp_result_valid || (load_store_ready && !first_cycle);
 assign reg32_o = reg32_data;
 assign mepc_o = csr_mepc;
 assign regfile_write_half_o = regfile_write_data;

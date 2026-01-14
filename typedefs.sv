@@ -248,7 +248,9 @@ package typedefs;
 		FNC3_LD_KEY = 3'b000,
 		FNC3_ST_ENC = 3'b001,
 		FNC3_ST_DEC = 3'b010,
-		FNC3_SYNC = 3'b100
+		FNC3_SYNC = 3'b100,
+		FNC3_SYNC_ST_ENC = 3'b101,
+		FNC3_SYNC_ST_DEC = 3'b110
 	} funct3_accel_e;
 
 	typedef enum logic [2:0] {

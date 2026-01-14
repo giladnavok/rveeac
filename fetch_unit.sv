@@ -36,9 +36,6 @@ module fetch_unit # (
 	output logic [31:0] pc_next_o 			///< Output PC of currently fetched instruction
 );
 
-localparam LOG2_PREFETCH_BUFFER_CAPACITY = $clog2(PREFETCH_BUFFER_CAPACITY);
-
-
 // ===============================
 //			Internal Wires        
 // ===============================
@@ -51,7 +48,6 @@ logic [31:0] imem_apb_rdata;
 
 logic [31:0] imem_apb_fetch_address;
 logic [31:0] pc_next;
-logic [31:0] jmp_target_requested;
 
 logic take_branch;
 logic in_speculative_state;
@@ -59,15 +55,14 @@ logic redirect;
 logic misspredict;
 logic interrupt;
 
-logic prefetch_write;
-logic prefetch_read;
+logic prefetch_enqueue;
+logic prefetch_dequeue;
 logic prefetch_flush;
 logic [31:0] prefetch_inst;
 logic [31:0] prefetch_pc;
-logic [31:0] prefetch_pc_next;
 logic prefetch_full;
 logic prefetch_full_next;
-logic [LOG2_PREFETCH_BUFFER_CAPACITY:0] prefetch_count;
+logic prefetch_count;
 
 
 // ===============================
@@ -76,6 +71,7 @@ logic [LOG2_PREFETCH_BUFFER_CAPACITY:0] prefetch_count;
 	
 logic [31:0] pc_current;
 logic [31:0] branch_alternative;
+logic [31:0] jmp_target_requested;
 logic inst_in_buffer_branch_jmp;
 logic branch_taken;
 logic jmp_requested;
@@ -126,16 +122,15 @@ prefetch_buffer_sbm # (
 
 	.inst_i(imem_apb_rdata),
 	.pc_i(pc_current),
-	.write_i(prefetch_write),
-	.read_i(prefetch_read),
+	.enqueue_i(prefetch_enqueue),
+	.dequeue_i(prefetch_dequeue),
 	.flush_i(prefetch_flush),
 
 	.inst_o(prefetch_inst),
 	.pc_o(prefetch_pc),
-	.pc_next_o(prefetch_pc_next),
 	.full_o(prefetch_full),
 	.full_next_o(prefetch_full_next),
-	.count_o(prefetch_count)
+	.empty_o(prefetch_empty)
 );
 
 
@@ -212,7 +207,8 @@ always_ff @(posedge clk or negedge rst_n) begin
 
 			ST_FULL_BUFFER: begin
 				assert(!branch_i);
-				if (jmp_i) begin
+				assert(!(jmp_i && !interrupt));
+				if (interrupt) begin
 					state_e <= ST_FETCH;
 					pc_current <= imem_apb_fetch_address;
 				end else if (ready_i) begin
@@ -238,13 +234,8 @@ always_ff @(posedge clk or negedge rst_n) begin
 						branch_alternative <= jmp_target_i;
 					end
 
-					if (prefetch_count > 0) begin
-						if (prefetch_full_next) begin
-							state_e <= branch_i ? ST_FULL_BUFFER_SPEC : ST_FULL_BUFFER;
-						end else begin
-							pc_current <= pc_next;
-							state_e <= branch_i ? ST_INIT_FETCH_SPEC : ST_INIT_FETCH;
-						end
+					if (!prefetch_empty && prefetch_full_next) begin
+						state_e <= branch_i ? ST_FULL_BUFFER_SPEC : ST_FULL_BUFFER;
 					end else begin
 						pc_current <= pc_next;
 						state_e <= branch_i ? ST_INIT_FETCH_SPEC : ST_INIT_FETCH;
@@ -259,7 +250,7 @@ always_ff @(posedge clk or negedge rst_n) begin
 				assert(!prefetch_full);
 				if (jmp_i) begin // must come from an interrupt?, in that case the branch is re executed 
 					//assert(interrupt);
-					jmp_requested <= 1'b1;
+					jmp_requested <= !misspredict;
 					jmp_target_requested <= jmp_target_i;
 					state_e <= ST_FETCH_DISCARD;
 				end else if (misspredict) begin
@@ -274,7 +265,9 @@ always_ff @(posedge clk or negedge rst_n) begin
 						branch_taken <= 1'b0;
 						branch_alternative <= jmp_target_i;
 					end
-					if (prefetch_count > 0) begin
+					// TODO: try removing this !prefetch_empty condition it
+					// looks redundent
+					if (!prefetch_empty) begin
 						assert(!(prefetch_full_next && branch_i));
 						if (prefetch_full_next) begin
 							state_e <= (branch_i || !branch_cmp_result_valid_i) ? ST_FULL_BUFFER_SPEC : ST_FULL_BUFFER;
@@ -349,14 +342,14 @@ assign misspredict = in_speculative_state && (branch_cmp_result_valid_i && (bran
 assign misspredict_o = misspredict;
 
 always_comb begin
-	pc_next_o = (prefetch_count > 0) ? prefetch_pc_next : pc_current; 
+	pc_next_o = (!prefetch_empty) ? prefetch_pc : pc_current; 
 	if (misspredict && interrupt) begin
 		pc_next_o = branch_alternative;
 	end
 end
 
 always_comb begin
-	prefetch_write = 1'b0;
+	prefetch_enqueue = 1'b0;
 	case (state_e)
 		ST_INIT_FETCH: begin
 			imem_apb_start = !stall_for_jmp_target_i;
@@ -374,7 +367,7 @@ always_comb begin
 		ST_FULL_BUFFER: begin
 			imem_apb_start = 1'b0;
 			imem_apb_fetch_address = 32'bx;
-			if (jmp_i || (branch_i && take_branch)) begin
+			if (interrupt) begin
 				imem_apb_start = 1'b1;
 				imem_apb_fetch_address = jmp_target_i;
 			end else if (ready_i) begin
@@ -421,8 +414,8 @@ always_comb begin
 			assert(!prefetch_full);
 			imem_apb_start = 1'b0;
 			imem_apb_fetch_address = pc_current;
-			if (imem_apb_valid && (prefetch_count > 0 || !ready_i)) begin
-				prefetch_write = 1'b1;
+			if (imem_apb_valid && (!prefetch_empty || !ready_i)) begin
+				prefetch_enqueue = 1'b1;
 			end
 		end
 	endcase
@@ -430,7 +423,7 @@ end
 
 
 always_comb begin
-	prefetch_read = 1'b0;
+	prefetch_dequeue = 1'b0;
 	prefetch_flush = 1'b0;
 	valid_o = 1'b0;
 
@@ -440,12 +433,12 @@ always_comb begin
 	if (redirect) begin
 		prefetch_flush = 1'b1;
 	end else begin
-		if (prefetch_count > 0) begin
+		if (!prefetch_empty) begin
 			pc_o = prefetch_pc;
 			inst_o = prefetch_inst;
 			valid_o = 1'b1;
 			if (ready_i) begin
-				prefetch_read = 1'b1;
+				prefetch_dequeue = 1'b1;
 			end
 		end else begin
 			if (imem_apb_valid && ready_i && (state_e != ST_FETCH_DISCARD)) begin

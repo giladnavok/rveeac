@@ -307,7 +307,7 @@ always_comb begin
 				cs_o.dec.sel.alu_wb_sel = ALU_WB_SEL_IMM;
 				// Enable //
 				cs_o.dec.en.csr_addr = ENABLE;
-				cs_o.dec.en.csr_imm_bypass = funct3_i[2];
+				cs_o.dec.en.csr_imm_bypass = funct3_i[2]; //! Maybe remove because not in use?
 				cs_o.dec.en.rs1_in_second_cycle = !funct3_i[2];
 
 				// Execution Stage //
@@ -387,6 +387,14 @@ always_comb begin
 				FNC3_ST_ENC: cs_o.exe.en.accel_start_enc = ENABLE;
 				FNC3_ST_DEC: cs_o.exe.en.accel_start_dec = ENABLE;
 				FNC3_SYNC:   cs_o.dec.en.wait_for_accel  = ENABLE;
+				FNC3_SYNC_ST_ENC:   begin
+					cs_o.dec.en.wait_for_accel  = ENABLE;
+				 	cs_o.exe.en.accel_start_enc = ENABLE;
+				end
+				FNC3_SYNC_ST_DEC:   begin
+					cs_o.dec.en.wait_for_accel  = ENABLE;
+				 	cs_o.exe.en.accel_start_dec = ENABLE;
+				end
 			endcase
 		end
 	endcase
