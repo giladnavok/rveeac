@@ -22,6 +22,8 @@ module csr_sbm (
 	input logic store_clear_mstatus_mie_i,
 	input logic restore_mstatus_mie_i,
 
+	input logic accel_ready_i,
+
 	output logic valid_o,
 	output logic [HALF_XLEN-1:0] read_data_o,
 
@@ -62,6 +64,9 @@ localparam bit [11:0] ADDR_MIP = 12'h344;
 localparam logic [31:0] WMASK_MIP = WMASK_MIE;
 
 localparam bit [11:0] ADDR_MTINST = 12'h34A;
+
+localparam bit [11:0] ADDR_ACCEL_STATUS = 12'hFC0;
+
 //localparam bit [11:0] ADDR_MTVAL2 = 12'h34B;
 
 // ----------------------------- //
@@ -111,6 +116,7 @@ logic write_allowed;
 always_comb begin
 	unique case (addr_i)
 		//ADDR_MEPC: write_allowed = 
+		ADDR_ACCEL_STATUS: write_allowed = 1'b0;
 		default:
 			write_allowed = 1'b1;
 	endcase
@@ -176,6 +182,7 @@ always_comb begin
 		ADDR_MTVAL: read_data_o =  mtval[h_sel_i];
 		ADDR_MIP: read_data_o =  mip[h_sel_i];
 		ADDR_MTINST: read_data_o =  mtinst[h_sel_i];
+		ADDR_ACCEL_STATUS: read_data_o = h_sel_i ? 16'b0 : {15'b0, accel_ready_i};
 		default:
 			// Maybe trap
 			read_data_o = 'x;

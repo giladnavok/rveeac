@@ -244,6 +244,8 @@ csr_sbm csr (
 	.store_clear_mstatus_mie_i(int_store_clear_mstatus_mie),
 	.restore_mstatus_mie_i(restore_mstatus_mie),
 
+	.accel_ready_i(accel_ready),
+
 	.valid_o(csr_valid),
 	.read_data_o(csr_read_data_out), 
 

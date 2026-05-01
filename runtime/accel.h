@@ -1,5 +1,7 @@
 #include <stdint.h>
 
+#define CSR_ACCEL_STATUS 0xFC0
+
 #define AES_LOAD_KEY() __asm__(".word 0x0000003b")
 #define AES_ENC()   __asm__(".word 0x0000103b")
 #define AES_DEC()   __asm__(".word 0x0000203b")
@@ -49,6 +51,16 @@
 		: "r"(ptr)\
 		: "t3", "t4", "t5", "t6", "memory"); \
 }\
+
+static inline bool ACCEL_IS_READY() {
+	uint32_t status;
+	__asm__ volatile (
+		"csrr %0, %1"
+		: "=r" (status)
+		: "i" (CSR_ACCEL_STATUS)
+	);
+	return (status & 0x1) == 1;
+}
 
 
 
