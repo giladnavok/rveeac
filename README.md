@@ -41,3 +41,34 @@ The core and accelerator were verified using a hybrid bottom-up and top-down app
 * **Module-Level Fuzzing:** The ALU and critical combinational logic were verified using a constrained-random fuzzer in SystemVerilog, checking 200,000+ iterations against a behavioral model.
 * **Directed Pipeline Verification:** Directed SystemVerilog testbenches validated pipeline hazard resolution (RAW dependencies, Load-Use stalls) and branch prediction flushing.
 * **System-Level Software Verification:** Compiled C programs validated standard runtime execution, CSR atomic operations, and AES correctness. The memory models injected random wait states (IMEM/DMEM delays) to ensure robust pipeline stalling and resumption.
+
+## Repository Structure
+```text
+├── HEA/                        # Hardware Encryption Accelerator
+│   ├── screenshots/            # Waveforms and architectural diagrams
+│   ├── src/                    # AES-128 SystemVerilog sources
+│   └── tb/                     # AES module-level testbenches & Python models
+├── runtime/                    # Software & Execution Environment
+│   ├── accel.h / accel.c       # C-library for AES custom instructions
+│   ├── crt0.S / trap.S         # Startup code and low-level trap handlers
+│   ├── linker.ld               # Linker script for RISC-V memory mapping
+│   ├── test_*.c                # System-level C tests (AES, CSR, Interrupts)
+│   └── tb_core_c_program.sv    # Testbench for running compiled C code on the core
+├── test/                       # Core SystemVerilog Testbenches
+│   ├── tb_core.sv              # Top-level pipeline and hazard verification
+│   ├── tb_alu_sbm.sv           # ALU constrained-random fuzzer
+│   └── tb_*.sv                 # Module-level unit tests for IF, ID, and CSR
+├── doc/                        # Documentation and .drawio source files
+├── resources/                  # Architecture specs and ISA documentation
+├── core.sv                     # Top-level RISC-V processor wrapper
+├── fetch_unit.sv               # IF Stage: APB controller & prefetch buffer
+├── decode_unit.sv              # ID Stage: Decoder & hazard logic
+├── exe_mem_wb_stage.sv         # EXE Stage: ALU, LSU, and Accel Integration
+├── alu_sbm.sv                  # Arithmetic Logic Unit
+├── csr_sbm.sv                  # Control and Status Registers (M-mode)
+├── interrupt_sbm.sv            # Interrupt controller
+├── regfile_sbm.sv              # Register File (16-bit split-write ports)
+├── load_store_unit.sv          # Data Memory APB interface
+├── typedefs.sv                 # Global SystemVerilog type definitions
+└── README.md
+```
